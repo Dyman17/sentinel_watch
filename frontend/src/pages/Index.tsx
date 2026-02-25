@@ -2,15 +2,21 @@ import { useState } from 'react';
 import { TopBar } from "@/components/dashboard/TopBar";
 import { SimpleStream } from "@/components/dashboard/SimpleStream";
 import { MapView } from "@/components/dashboard/MapView";
+import ImageUpload from "@/components/dashboard/ImageUpload";
+import AIStatus from "@/components/dashboard/AIStatus";
 import { Button } from "@/components/ui/button";
-import { Camera, BarChart3, Map } from "lucide-react";
+import { Camera, BarChart3, Map, Upload, Brain } from "lucide-react";
 
 const Index = () => {
-  const [activeView, setActiveView] = useState<'stream' | 'logs' | 'map'>('stream');
+  const [activeView, setActiveView] = useState<'stream' | 'logs' | 'map' | 'upload' | 'status'>('stream');
   const [detections, setDetections] = useState<any[]>([]);
 
   const renderMainContent = () => {
     switch (activeView) {
+      case 'status':
+        return <AIStatus />;
+      case 'upload':
+        return <ImageUpload />;
       case 'logs':
         return (
           <div className="flex-1 p-4">
@@ -57,6 +63,24 @@ const Index = () => {
           >
             <Camera className="w-4 h-4" />
             Мониторинг
+          </Button>
+          <Button
+            variant={activeView === 'upload' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveView('upload')}
+            className="gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Загрузить
+          </Button>
+          <Button
+            variant={activeView === 'status' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveView('status')}
+            className="gap-2"
+          >
+            <Brain className="w-4 h-4" />
+            AI Статус
           </Button>
           <Button
             variant={activeView === 'map' ? 'default' : 'ghost'}

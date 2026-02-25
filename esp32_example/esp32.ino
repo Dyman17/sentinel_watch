@@ -6,8 +6,8 @@
 #include <LiquidCrystal_I2C.h>
 
 // --- WiFi настройки ---
-const char* ssid = "YOUR_WIFI_SSID";           // Твоя WiFi сеть
-const char* password = "YOUR_WIFI_PASSWORD";     // Пароль WiFi
+const char* ssid = "BB";           // Твоя WiFi сеть
+const char* password = "Student111";     // Пароль WiFi
 
 // --- WebSocket сервер SENTINEL.SAT ---
 const char* ws_server = "sentinel-sat.onrender.com";  // Без http://

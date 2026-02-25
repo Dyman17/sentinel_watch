@@ -6,6 +6,9 @@ import io
 import json
 import time
 import os
+import torch
+from transformers import pipeline
+from huggingface_hub import hf_hub_download
 
 # --- Конфигурация ---
 SENTINEL_SERVER_URL = os.getenv("SENTINEL_SERVER_URL", "https://sentinel-sat.onrender.com")
@@ -18,6 +21,20 @@ YOLO_DISASTER_CLASSES = {
     "earthquake": ["earthquake", "collapse", "rubble", "destruction", "damaged"],
     "storm": ["storm", "tornado", "hurricane", "cyclone", "wind"]
 }
+
+# --- Загрузка реальной YOLO модели ---
+print("🤖 Loading YOLO model...")
+try:
+    # Используем DETR для детекции объектов
+    object_detector = pipeline(
+        "object-detection", 
+        model="facebook/detr-resnet-50",
+        device=0 if torch.cuda.is_available() else -1
+    )
+    print("✅ YOLO model loaded successfully!")
+except Exception as e:
+    print(f"❌ Error loading model: {e}")
+    object_detector = None
 
 def analyze_image(image):
     """
@@ -32,9 +49,8 @@ def analyze_image(image):
         image.save(img_byte_arr, format='JPEG')
         img_bytes = img_byte_arr.getvalue()
         
-        # Создаем результат детекции (симуляция YOLO модели)
-        # В реальном коде здесь будет вызов YOLO модели
-        predictions = simulate_yolo_detection(image)
+        # Создаем результат детекции (РЕАЛЬНАЯ YOLO МОДЕЛЬ)
+        predictions = real_yolo_detection(image)
         
         # Обрабатываем результаты для катастроф
         disaster_detections = []
@@ -97,43 +113,40 @@ def analyze_image(image):
     except Exception as e:
         return f"❌ Ошибка: {str(e)}", None
 
-def simulate_yolo_detection(image):
+def real_yolo_detection(image):
     """
-    Симуляция YOLO детекции (заменить на реальную модель)
+    РЕАЛЬНАЯ YOLO детекция с помощью DETR модели
     """
-    # В реальном коде здесь будет загрузка YOLO модели и детекция
-    # Сейчас симулируем результаты для демонстрации
+    if object_detector is None:
+        print("❌ Model not loaded")
+        return []
     
-    width, height = image.size
-    
-    # Симуляция детекции (случайные объекты)
-    import random
-    predictions = []
-    
-    # Генерируем случайные детекции
-    num_objects = random.randint(0, 3)
-    
-    for i in range(num_objects):
-        # Случайный тип объекта
-        labels = ["fire", "smoke", "water", "building", "tree", "car", "person"]
-        label = random.choice(labels)
+    try:
+        print(f"🔍 Analyzing image with real YOLO model...")
         
-        # Случайная уверенность
-        score = random.uniform(0.5, 0.95)
+        # Запускаем детекцию
+        results = object_detector(image)
         
-        # Случайные координаты bounding box
-        x1 = random.randint(0, width // 2)
-        y1 = random.randint(0, height // 2)
-        x2 = x1 + random.randint(50, 200)
-        y2 = y1 + random.randint(50, 200)
+        # Конвертируем результаты в нужный формат
+        predictions = []
+        for result in results:
+            predictions.append({
+                'label': result['label'],
+                'score': result['score'],
+                'box': {
+                    'xmin': result['box']['xmin'],
+                    'ymin': result['box']['ymin'],
+                    'xmax': result['box']['xmax'],
+                    'ymax': result['box']['ymax']
+                }
+            })
         
-        predictions.append({
-            'label': label,
-            'score': score,
-            'box': {'xmin': x1, 'ymin': y1, 'xmax': x2, 'ymax': y2}
-        })
-    
-    return predictions
+        print(f"✅ Real YOLO detection found {len(predictions)} objects")
+        return predictions
+        
+    except Exception as e:
+        print(f"❌ Error in real detection: {e}")
+        return []
 
 def check_server_status():
     """
