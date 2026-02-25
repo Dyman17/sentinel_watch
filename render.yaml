@@ -4,7 +4,8 @@ services:
     env: python
     buildCommand: |
       pip install -r requirements.txt
-      cd frontend && npm install --verbose && npm run build --verbose
+      ls -la frontend/
+      cd frontend && ls -la && npm install --verbose && npm run build --verbose
       mkdir -p ../static && cp -r dist/* ../static/
     startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
