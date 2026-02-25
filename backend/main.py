@@ -1,37 +1,36 @@
+import os
+import io
+import time
+import requests
+import numpy as np
 import subprocess
 import shutil
 from pathlib import Path
-import os
-from fastapi import FastAPI
+from typing import Dict, Any, List
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.background import BackgroundTask
+from PIL import Image
 import uvicorn
 import logging
-import requests
-import json
-from typing import Dict, Any, List
-import base64
-from io import BytesIO
-from PIL import Image
-import numpy as np
-import cv2
 
-# Настройка логов
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# ----------------------------
+# Настройки
+# ----------------------------
+HF_API_URL = os.getenv("HF_API_URL", "https://api-inference.huggingface.co/models/Dyman17/sentinel-watch")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
+ESP_STREAM_URL = os.getenv("ESP_STREAM_URL", "http://192.168.1.100:81/stream")
 
-app = FastAPI(title="SENTINEL.SAT", version="1.0.0")
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# --- Пути ---
+# --- Пути для фронтенда ---
 frontend_dir = Path(__file__).parent.parent / "frontend"
 static_dir = Path(__file__).parent / "static"
 
-# --- HuggingFace Configuration ---
-HF_API_URL = os.getenv("HF_API_URL", "https://api-inference.huggingface.co/models/your-username/disaster-detection")
-HF_TOKEN = os.getenv("HF_TOKEN", "")
-HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-
-# --- Disaster Detection Classes ---
+# Disaster Detection Classes
 YOLO_DISASTER_CLASSES = {
     "fire": ["fire", "flame", "smoke", "burning", "blaze"],
     "flood": ["flood", "water", "inundated", "submerged", "overflow"],
@@ -39,102 +38,47 @@ YOLO_DISASTER_CLASSES = {
     "storm": ["storm", "tornado", "hurricane", "cyclone", "wind"]
 }
 
-# --- Global Variables ---
-current_frame = None
-detection_results = []
-stream_url = os.getenv("ESP_STREAM_URL", "http://192.168.1.100:81/stream")
+# Global storage
+detection_history = []
 
-# --- HuggingFace Analysis Function ---
-def analyze_with_hf(frame: np.ndarray) -> Dict[str, Any]:
-    """Analyze image frame using HuggingFace YOLO API"""
-    try:
-        # Convert frame to bytes
-        _, img_encoded = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        img_bytes = img_encoded.tobytes()
-        
-        # Send to HuggingFace YOLO
-        response = requests.post(
-            HF_API_URL,
-            headers=HEADERS,
-            data=img_bytes,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            logger.info(f"YOLO analysis successful: {len(result.get('predictions', []))} objects detected")
-            
-            # Process YOLO predictions for disaster detection
-            predictions = result.get('predictions', [])
-            disaster_detections = []
-            
-            for pred in predictions:
-                label = pred.get('label', '').lower()
-                score = pred.get('score', 0)
-                
-                # Map YOLO labels to disaster categories
-                for disaster_type, keywords in YOLO_DISASTER_CLASSES.items():
-                    if any(keyword in label for keyword in keywords):
-                        disaster_detections.append({
-                            'label': disaster_type,
-                            'score': score,
-                            'original_label': label,
-                            'box': pred.get('box', {})
-                        })
-                        break
-            
-            return {
-                'predictions': predictions,
-                'disaster_detections': disaster_detections,
-                'total_objects': len(predictions),
-                'disasters_found': len(disaster_detections)
-            }
-        else:
-            logger.error(f"HF API error: {response.status_code} - {response.text}")
-            return {"error": f"API error: {response.status_code}"}
-            
-    except Exception as e:
-        logger.error(f"Error in HF analysis: {e}")
-        return {"error": str(e)}
+# Настройка логов
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# --- Test HF Connection ---
-def test_hf_connection():
-    """Test connection to HuggingFace API"""
-    try:
-        response = requests.get(HF_API_URL.replace("/models/", "/models/"), headers=HEADERS, timeout=10)
-        if response.status_code == 200:
-            logger.info("✅ HuggingFace API connection successful")
-            return True
-        else:
-            logger.error(f"❌ HF API connection failed: {response.status_code}")
-            return False
-    except Exception as e:
-        logger.error(f"❌ HF API connection error: {e}")
-        return False
+# ----------------------------
+# FastAPI и CORS
+# ----------------------------
+app = FastAPI(title="SENTINEL.SAT - AI Disaster Monitoring System", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ----------------------------
+# Билд фронтенда
+# ----------------------------
 def build_frontend():
     """Билдит фронтенд и копирует в static"""
     try:
         logger.info("📦 Билдим фронтенд...")
         
-        # Проверяем наличие frontend
         if not frontend_dir.exists():
             raise FileNotFoundError(f"Папка frontend не найдена: {frontend_dir}")
         
-        # Устанавливаем зависимости
         logger.info("📦 npm install...")
         result = subprocess.run(["npm", "install"], cwd=frontend_dir, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error(f"npm install failed: {result.stderr}")
             raise Exception("npm install failed")
         
-        # Собираем фронтенд
         logger.info("🔨 npm run build...")
         result = subprocess.run(["npm", "run", "build"], cwd=frontend_dir, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error(f"npm run build failed: {result.stderr}")
             raise Exception("npm run build failed")
         
-        # Копируем в static
         if static_dir.exists():
             shutil.rmtree(static_dir)
         static_dir.mkdir()
@@ -146,7 +90,6 @@ def build_frontend():
         shutil.copytree(dist_dir, static_dir, dirs_exist_ok=True)
         logger.info("✅ Фронтенд собран и скопирован в static/")
         
-        # Проверяем что скопировалось
         index_path = static_dir / "index.html"
         if not index_path.exists():
             raise FileNotFoundError(f"index.html не найден в static: {index_path}")
@@ -157,47 +100,175 @@ def build_frontend():
         logger.error(f"❌ Ошибка сборки фронтенда: {e}")
         raise
 
-# --- Монтируем статику ---
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+# ----------------------------
+# Вспомогательные функции
+# ----------------------------
+def analyze_with_hf(frame: np.ndarray) -> Dict[str, Any]:
+    """
+    Отправляет кадр на HuggingFace модель и возвращает результаты
+    """
+    try:
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+        img_bytes = io.BytesIO()
+        Image.fromarray(frame).save(img_bytes, format="JPEG")
+        img_bytes.seek(0)
+        
+        response = requests.post(HF_API_URL, headers=headers, files={"file": img_bytes}, timeout=30)
+        if response.status_code != 200:
+            logger.error(f"HF API error: {response.status_code} - {response.text}")
+            return {"error": f"HF API error: {response.status_code}"}
+        
+        result = response.json()
+        logger.info(f"YOLO analysis successful: {len(result.get('predictions', []))} objects detected")
+        
+        # Process YOLO predictions for disaster detection
+        predictions = result.get('predictions', [])
+        disaster_detections = []
+        
+        for pred in predictions:
+            label = pred.get('label', '').lower()
+            score = pred.get('score', 0)
+            
+            # Map YOLO labels to disaster categories
+            for disaster_type, keywords in YOLO_DISASTER_CLASSES.items():
+                if any(keyword in label for keyword in keywords):
+                    disaster_detections.append({
+                        'label': disaster_type,
+                        'score': score,
+                        'original_label': label,
+                        'box': pred.get('box', {}),
+                        'timestamp': time.time()
+                    })
+                    break
+        
+        analysis_result = {
+            'predictions': predictions,
+            'disaster_detections': disaster_detections,
+            'total_objects': len(predictions),
+            'disasters_found': len(disaster_detections),
+            'timestamp': time.time()
+        }
+        
+        detection_history.append(analysis_result)
+        return analysis_result
+        
+    except Exception as e:
+        logger.error(f"Error in HF analysis: {e}")
+        return {"error": str(e)}
 
-# --- API Endpoints ---
+def fetch_esp_frame() -> np.ndarray:
+    """
+    Получает кадр с ESP32 потока
+    """
+    try:
+        resp = requests.get(ESP_STREAM_URL, stream=True, timeout=10)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Failed to fetch ESP32 frame: {resp.status_code}")
+        
+        img = Image.open(resp.raw).convert("RGB")
+        return np.array(img)
+    except Exception as e:
+        logger.error(f"Error fetching ESP32 frame: {e}")
+        raise
+
+def test_hf_connection():
+    """Test connection to HuggingFace API"""
+    try:
+        response = requests.get(HF_API_URL.replace("/models/", "/models/"), headers={"Authorization": f"Bearer {HF_TOKEN}"}, timeout=10)
+        if response.status_code == 200:
+            logger.info("✅ HuggingFace API connection successful")
+            return True
+        else:
+            logger.error(f"❌ HF API connection failed: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.error(f"❌ HF API connection error: {e}")
+        return False
+
+# ----------------------------
+# API эндпоинты
+# ----------------------------
+
 @app.get("/api/health")
-def health():
+def health_check():
+    """
+    Проверка подключения к HuggingFace
+    """
     hf_status = test_hf_connection()
     return {
-        "status": "ok", 
-        "message": "SENTINEL.SAT работает!",
-        "hf_connected": hf_status,
+        "hf_status": hf_status, 
         "hf_api_url": HF_API_URL,
-        "stream_url": stream_url
+        "esp_stream_url": ESP_STREAM_URL,
+        "message": "HuggingFace connection OK" if hf_status else "Failed"
     }
 
-@app.get("/api/analyze")
-def analyze():
-    """Analyze current frame with HuggingFace"""
-    if current_frame is None:
-        return {"error": "No frame available"}
-    
-    result = analyze_with_hf(current_frame)
-    detection_results.append(result)
-    return result
+@app.post("/api/upload")
+async def upload_image(file: UploadFile = File(...)):
+    """
+    Получение фото с ESP32 или ручная загрузка
+    """
+    try:
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+        
+        # Анализируем загруженное изображение
+        img = Image.open(file_path).convert("RGB")
+        frame = np.array(img)
+        result = analyze_with_hf(frame)
+        
+        return JSONResponse({
+            "status": "success", 
+            "filename": file.filename,
+            "analysis": result
+        })
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
 
-@app.get("/api/stream")
-def stream():
-    """Get video stream URL"""
-    return {"stream_url": stream_url, "status": "active"}
+@app.get("/api/analyze")
+def analyze_latest():
+    """
+    Анализ последнего кадра с ESP32 через HuggingFace
+    """
+    try:
+        frame = fetch_esp_frame()
+        result = analyze_with_hf(frame)
+        return JSONResponse({"status": "success", "result": result})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
 
 @app.get("/api/detections")
-def get_detections():
-    """Get recent detection results"""
-    return {"detections": detection_results[-10:]}  # Last 10 detections
+def detections_history():
+    """
+    Возвращает историю детекций
+    """
+    return {"history": detection_history[-20:]}  # Last 20 detections
 
 @app.post("/api/set-stream")
-def set_stream_url(data: Dict[str, str]):
-    """Set new stream URL"""
-    global stream_url
-    stream_url = data.get("url", stream_url)
-    return {"success": True, "stream_url": stream_url}
+def set_stream(url: str):
+    """
+    Установка нового URL видеопотока ESP32
+    """
+    global ESP_STREAM_URL
+    ESP_STREAM_URL = url
+    return {"status": "success", "new_stream_url": ESP_STREAM_URL}
+
+@app.get("/api/stream")
+def stream_camera():
+    """
+    Потоковое видео (jpeg snapshot) с ESP32
+    """
+    try:
+        frame = fetch_esp_frame()
+        img_bytes = io.BytesIO()
+        Image.fromarray(frame).save(img_bytes, format="JPEG")
+        img_bytes.seek(0)
+        return StreamingResponse(io.BytesIO(img_bytes.read()), media_type="image/jpeg")
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)})
+
+# --- Статика и фронтенд ---
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
 @app.get("/")
 def serve_frontend():
