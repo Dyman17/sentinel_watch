@@ -3,8 +3,8 @@ services:
     name: sentinel-sat
     env: python
     plan: free
-    buildCommand: python main.py
-    startCommand: python main.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main_auto.py
     healthCheckPath: /api/health
     autoDeploy: yes
     envVars:
