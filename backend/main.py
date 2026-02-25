@@ -211,6 +211,48 @@ async def upload_frame(file: UploadFile = File(...)):
             "message": str(e)
         }, status_code=500)
 
+@app.post("/api/hf-results")
+async def receive_hf_results(data: dict):
+    """
+    Принимает результаты от HuggingFace Space
+    """
+    try:
+        logger.info(f"🤖 Получены результаты от HF Space: {data}")
+        
+        # Обрабатываем результаты
+        disaster_detections = data.get('disaster_detections', [])
+        total_objects = data.get('total_objects', 0)
+        disasters_found = data.get('disasters_found', 0)
+        
+        # Добавляем в историю
+        analysis_result = {
+            'predictions': data.get('predictions', []),
+            'disaster_detections': disaster_detections,
+            'total_objects': total_objects,
+            'disasters_found': disasters_found,
+            'timestamp': data.get('timestamp', asyncio.get_event_loop().time()),
+            'source': 'hf_space'
+        }
+        
+        detection_history.append(analysis_result)
+        
+        # Рассылаем результаты всем клиентам (опционально)
+        if disasters_found > 0:
+            logger.info(f"🚨 HF Space обнаружил {disasters_found} катастроф!")
+        
+        return {
+            "status": "success",
+            "message": "Results received and processed",
+            "total_detections": len(detection_history)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка обработки HF результатов: {e}")
+        return JSONResponse({
+            "status": "error", 
+            "message": str(e)
+        }, status_code=500)
+
 @app.post("/api/upload")
 async def upload_image(file: UploadFile = File(...)):
     """
