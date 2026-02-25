@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
 import logging
 
@@ -69,8 +69,11 @@ def data():
     return {"msg": "Бэкенд + фронт работает!", "status": "active"}
 
 @app.get("/")
-def root():
-    return {"message": "SENTINEL.SAT - AI Disaster Monitoring System", "status": "ready"}
+def serve_frontend():
+    index_path = os.path.join("static", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse({"error": "Frontend not built yet"}, status_code=503)
 
 # --- Старт сервера ---
 if __name__ == "__main__":
