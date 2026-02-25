@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="SENTINEL.SAT", version="1.0.0")
 
 # --- Пути ---
-frontend_dir = Path(__file__).parent / "frontend"
+frontend_dir = Path(__file__).parent.parent / "frontend"
 static_dir = Path(__file__).parent / "static"
 
 # --- Билдим фронтенд при старте ---
