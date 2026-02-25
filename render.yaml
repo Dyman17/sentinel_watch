@@ -3,15 +3,8 @@ services:
     name: sentinel-sat
     env: python
     plan: free
-    buildCommand: |
-      pip install -r requirements.txt
-      cd frontend
-      npm install
-      npm run build
-      cd ..
-      mkdir -p static
-      cp -r frontend/dist/* static/
-    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: python main.py
+    startCommand: python main.py
     healthCheckPath: /api/health
     autoDeploy: yes
     envVars:
