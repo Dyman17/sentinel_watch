@@ -8,12 +8,14 @@ import subprocess
 import shutil
 from pathlib import Path
 from typing import List
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import logging
+import json
+import time
 
 # --- Настройка логов ---
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +44,12 @@ static_dir = Path(__file__).parent / "static"
 # --- Стрим фронтенду ---
 clients: List[asyncio.Queue] = []
 
+# --- WebSocket клиенты для логов ---
+log_clients: List[WebSocket] = []
+
+# --- Очередь логов ---
+log_queue = asyncio.Queue()
+
 # Disaster Detection Classes
 YOLO_DISASTER_CLASSES = {
     "fire": ["fire", "flame", "smoke", "burning", "blaze"],
@@ -53,6 +61,41 @@ YOLO_DISASTER_CLASSES = {
 # Global storage
 detection_history = []
 
+async def broadcast_log(log_data: dict):
+    """Рассылает логи всем WebSocket клиентам"""
+    if log_clients:
+        message = json.dumps(log_data)
+        disconnected_clients = []
+        
+        for client in log_clients:
+            try:
+                await client.send_text(message)
+            except:
+                disconnected_clients.append(client)
+        
+        # Удаляем отключенных клиентов
+        for client in disconnected_clients:
+            log_clients.remove(client)
+
+async def add_log(disasters_found: int, disaster_type: str = "", confidence: float = 0.0, total_objects: int = 0):
+    """Добавляет лог в очередь и рассылает клиентам"""
+    log_data = {
+        "disasters_found": disasters_found,
+        "disaster_type": disaster_type,
+        "confidence": confidence,
+        "total_objects": total_objects,
+        "timestamp": time.time(),
+        "clients_connected": len(clients)
+    }
+    
+    # Добавляем в очередь
+    await log_queue.put(log_data)
+    
+    # Рассылаем WebSocket клиентам
+    await broadcast_log(log_data)
+    
+    logger.info(f"📝 Log added: {disasters_found} disasters, type: {disaster_type}")
+
 async def broadcast_frame(frame_bytes: bytes):
     """Рассылает кадр всем подключенным фронтенд-клиентам"""
     for queue in clients:
@@ -60,6 +103,51 @@ async def broadcast_frame(frame_bytes: bytes):
             await queue.put(frame_bytes)
         except:
             pass
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    """WebSocket для логов ESP32"""
+    await websocket.accept()
+    log_clients.append(websocket)
+    logger.info(f"📡 ESP32 Logger connected: {len(log_clients)} clients")
+    
+    # Отправляем приветственное сообщение
+    await websocket.send_text(json.dumps({
+        "type": "connected",
+        "message": "ESP32 Logger connected to SENTINEL.SAT",
+        "timestamp": time.time()
+    }))
+    
+    try:
+        while True:
+            # Ждем сообщения от клиента
+            data = await websocket.receive_text()
+            
+            # Обрабатываем команды от ESP32
+            if data == "status":
+                await websocket.send_text(json.dumps({
+                    "type": "status",
+                    "server": "ok",
+                    "clients_connected": len(clients),
+                    "total_detections": len(detection_history),
+                    "timestamp": time.time()
+                }))
+            elif data == "reset":
+                # Сброс счетчиков
+                await websocket.send_text(json.dumps({
+                    "type": "reset",
+                    "message": "Counters reset",
+                    "timestamp": time.time()
+                }))
+            
+    except WebSocketDisconnect:
+        logger.info("📡 ESP32 Logger disconnected")
+        if websocket in log_clients:
+            log_clients.remove(websocket)
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        if websocket in log_clients:
+            log_clients.remove(websocket)
 
 @app.get("/api/stream")
 async def stream():
@@ -187,6 +275,21 @@ async def upload_frame(file: UploadFile = File(...)):
                 
                 detection_history.append(analysis_result)
                 hf_result = analysis_result
+                
+                # Отправляем лог в WebSocket
+                if disaster_detections:
+                    main_disaster = disaster_detections[0]
+                    await add_log(
+                        disasters_found=len(disaster_detections),
+                        disaster_type=main_disaster['label'],
+                        confidence=main_disaster['score'],
+                        total_objects=len(predictions)
+                    )
+                else:
+                    await add_log(
+                        disasters_found=0,
+                        total_objects=len(predictions)
+                    )
                 
             else:
                 logger.error(f"❌ HF API ошибка: {resp.status_code}")
