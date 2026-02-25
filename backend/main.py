@@ -87,6 +87,14 @@ def serve_frontend():
         logger.error(f"❌ index.html не найден: {index_path}")
         return JSONResponse({"error": "Frontend not built yet"}, status_code=503)
 
+# Fallback для всех остальных путей - отдаем index.html для React Router
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str):
+    index_path = os.path.join("static", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
 # --- Старт сервера ---
 if __name__ == "__main__":
     try:
