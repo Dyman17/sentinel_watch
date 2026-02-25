@@ -29,12 +29,14 @@ def build_frontend():
             raise FileNotFoundError(f"Папка frontend не найдена: {frontend_dir}")
         
         # Устанавливаем зависимости
+        logger.info("📦 npm install...")
         result = subprocess.run(["npm", "install"], cwd=frontend_dir, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error(f"npm install failed: {result.stderr}")
             raise Exception("npm install failed")
         
         # Собираем фронтенд
+        logger.info("🔨 npm run build...")
         result = subprocess.run(["npm", "run", "build"], cwd=frontend_dir, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error(f"npm run build failed: {result.stderr}")
@@ -51,6 +53,13 @@ def build_frontend():
         
         shutil.copytree(dist_dir, static_dir, dirs_exist_ok=True)
         logger.info("✅ Фронтенд собран и скопирован в static/")
+        
+        # Проверяем что скопировалось
+        index_path = static_dir / "index.html"
+        if not index_path.exists():
+            raise FileNotFoundError(f"index.html не найден в static: {index_path}")
+        
+        logger.info(f"✅ index.html найден: {index_path}")
         
     except Exception as e:
         logger.error(f"❌ Ошибка сборки фронтенда: {e}")
@@ -72,8 +81,11 @@ def data():
 def serve_frontend():
     index_path = os.path.join("static", "index.html")
     if os.path.exists(index_path):
+        logger.info(f"📄 Отдаю index.html: {index_path}")
         return FileResponse(index_path)
-    return JSONResponse({"error": "Frontend not built yet"}, status_code=503)
+    else:
+        logger.error(f"❌ index.html не найден: {index_path}")
+        return JSONResponse({"error": "Frontend not built yet"}, status_code=503)
 
 # --- Старт сервера ---
 if __name__ == "__main__":
