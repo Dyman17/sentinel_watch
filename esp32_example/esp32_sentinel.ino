@@ -4,8 +4,8 @@
 #include <ArduinoJson.h>
 
 // --- WiFi настройки ---
-const char* ssid = "YOUR_WIFI_SSID";           // Твоя WiFi сеть
-const char* password = "YOUR_WIFI_PASSWORD";     // Пароль WiFi
+const char* ssid = "BB";           // Твоя WiFi сеть
+const char* password = "Student111";     // Пароль WiFi
 
 // --- URL сервера SENTINEL.SAT ---
 const char* serverUrl = "https://sentinel-sat.onrender.com/api/upload-frame";
@@ -16,7 +16,7 @@ const char* serverUrl = "https://sentinel-sat.onrender.com/api/upload-frame";
 #include "camera_pins.h"
 
 // --- Интервал отправки кадров (мс) ---
-#define FRAME_INTERVAL 5000  // 5 секунд
+#define FRAME_INTERVAL 250  // 0.25 секунды
 unsigned long lastFrameTime = 0;
 
 // --- WiFi клиент ---

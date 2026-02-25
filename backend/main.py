@@ -1,6 +1,5 @@
 import os
 import io
-import cv2
 import uvicorn
 import asyncio
 import numpy as np
@@ -130,18 +129,16 @@ async def upload_frame(file: UploadFile = File(...)):
         logger.info(f"📸 Получен кадр от ESP32: {len(img_bytes)} байт")
         
         # Конвертируем в numpy для обработки
-        frame_np = np.frombuffer(img_bytes, np.uint8)
-        frame = cv2.imdecode(frame_np, cv2.IMREAD_COLOR)
-        
-        if frame is None:
-            # Если cv2 не смог декодировать, пробуем через PIL
-            img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            frame = np.array(img)
+        frame = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        frame_np = np.array(frame)
         
         # --- Отправляем на фронт ---
         try:
-            _, jpeg_bytes = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            await broadcast_frame(jpeg_bytes.tobytes())
+            # Сохраняем JPEG для стрима через PIL
+            output = io.BytesIO()
+            frame.save(output, format="JPEG", quality=85)
+            jpeg_bytes = output.getvalue()
+            await broadcast_frame(jpeg_bytes)
             logger.info("📡 Кадр отправлен на фронтенд")
         except Exception as e:
             logger.error(f"❌ Ошибка отправки на фронтенд: {e}")
