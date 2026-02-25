@@ -58,6 +58,13 @@ YOLO_DISASTER_CLASSES = {
     "storm": ["storm", "tornado", "hurricane", "cyclone", "wind"]
 }
 
+# --- Глобальные переменные для оптимизации ---
+latest_log = {}
+last_analysis_time = 0
+ANALYSIS_INTERVAL = 3.0  # Анализ каждые 3 секунды
+last_ping_time = {}
+PING_INTERVAL = 20.0  # Ping каждые 20 секунд
+
 # Global storage
 detection_history = []
 
@@ -106,9 +113,12 @@ async def broadcast_frame(frame_bytes: bytes):
 
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
-    """WebSocket для логов ESP32"""
+    """WebSocket для логов ESP32 с ping/pong"""
     await websocket.accept()
     log_clients.append(websocket)
+    client_id = id(websocket)
+    last_ping_time[client_id] = time.time()
+    
     logger.info(f"📡 ESP32 Logger connected: {len(log_clients)} clients")
     
     # Отправляем приветственное сообщение
@@ -120,34 +130,60 @@ async def websocket_logs(websocket: WebSocket):
     
     try:
         while True:
-            # Ждем сообщения от клиента
-            data = await websocket.receive_text()
+            current_time = time.time()
             
-            # Обрабатываем команды от ESP32
-            if data == "status":
-                await websocket.send_text(json.dumps({
-                    "type": "status",
-                    "server": "ok",
-                    "clients_connected": len(clients),
-                    "total_detections": len(detection_history),
-                    "timestamp": time.time()
-                }))
-            elif data == "reset":
-                # Сброс счетчиков
-                await websocket.send_text(json.dumps({
-                    "type": "reset",
-                    "message": "Counters reset",
-                    "timestamp": time.time()
-                }))
+            # Ping/pong каждые 20 секунд
+            if current_time - last_ping_time[client_id] > PING_INTERVAL:
+                try:
+                    await websocket.send_text(json.dumps({
+                        "type": "ping",
+                        "timestamp": current_time
+                    }))
+                    last_ping_time[client_id] = current_time
+                except:
+                    break
             
+            # Ждем сообщения от клиента с таймаутом
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                
+                # Обрабатываем pong
+                if data == "pong":
+                    last_ping_time[client_id] = time.time()
+                    continue
+                
+                # Обрабатываем команды от ESP32
+                if data == "status":
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "server": "ok",
+                        "clients_connected": len(clients),
+                        "total_detections": len(detection_history),
+                        "latest_log": latest_log,
+                        "timestamp": time.time()
+                    }))
+                elif data == "reset":
+                    # Сброс счетчиков
+                    latest_log = {}
+                    await websocket.send_text(json.dumps({
+                        "type": "reset",
+                        "message": "Counters reset",
+                        "timestamp": time.time()
+                    }))
+                    
+            except asyncio.TimeoutError:
+                # Таймаут - продолжаем цикл для ping
+                continue
+                
     except WebSocketDisconnect:
         logger.info("📡 ESP32 Logger disconnected")
-        if websocket in log_clients:
-            log_clients.remove(websocket)
     except Exception as e:
         logger.error(f"❌ WebSocket error: {e}")
+    finally:
         if websocket in log_clients:
             log_clients.remove(websocket)
+        if client_id in last_ping_time:
+            del last_ping_time[client_id]
 
 @app.get("/api/stream")
 async def stream():
@@ -231,73 +267,97 @@ async def upload_frame(file: UploadFile = File(...)):
         except Exception as e:
             logger.error(f"❌ Ошибка отправки на фронтенд: {e}")
         
-        # --- Отправляем на HuggingFace ---
-        hf_result = None
-        try:
-            resp = requests.post(
-                HF_API_URL,
-                files={"data": ("frame.jpg", img_bytes, "image/jpeg")},
-                headers={"Authorization": HF_TOKEN},
-                timeout=10
-            )
+        # --- Отправляем на HuggingFace с ограничением частоты ---
+        current_time = time.time()
+        should_analyze = (current_time - last_analysis_time) > ANALYSIS_INTERVAL
+        
+        if should_analyze:
+            last_analysis_time = current_time
+            logger.info("🤖 Starting HF analysis...")
             
-            if resp.status_code == 200:
-                hf_result = resp.json()
-                logger.info(f"🤖 HF анализ успешен: {hf_result}")
+            try:
+                resp = requests.post(
+                    HF_API_URL,
+                    files={"data": ("frame.jpg", img_bytes, "image/jpeg")},
+                    headers={"Authorization": HF_TOKEN},
+                    timeout=10
+                )
                 
-                # Обрабатываем результаты детекции
-                predictions = hf_result.get('predictions', [])
-                disaster_detections = []
-                
-                for pred in predictions:
-                    label = pred.get('label', '').lower()
-                    score = pred.get('score', 0)
+                if resp.status_code == 200:
+                    hf_result = resp.json()
+                    logger.info(f"🤖 HF анализ успешен: {hf_result}")
                     
-                    # Map YOLO labels to disaster categories
-                    for disaster_type, keywords in YOLO_DISASTER_CLASSES.items():
-                        if any(keyword in label for keyword in keywords):
-                            disaster_detections.append({
-                                'label': disaster_type,
-                                'score': score,
-                                'original_label': label,
-                                'box': pred.get('box', {}),
-                                'timestamp': asyncio.get_event_loop().time()
-                            })
-                            break
-                
-                analysis_result = {
-                    'predictions': predictions,
-                    'disaster_detections': disaster_detections,
-                    'total_objects': len(predictions),
-                    'disasters_found': len(disaster_detections),
-                    'timestamp': asyncio.get_event_loop().time()
-                }
-                
-                detection_history.append(analysis_result)
-                hf_result = analysis_result
-                
-                # Отправляем лог в WebSocket
-                if disaster_detections:
-                    main_disaster = disaster_detections[0]
+                    # Обрабатываем результаты детекции
+                    predictions = hf_result.get('predictions', [])
+                    disaster_detections = []
+                    
+                    for pred in predictions:
+                        label = pred.get('label', '').lower()
+                        score = pred.get('score', 0)
+                        
+                        # Map YOLO labels to disaster categories
+                        for disaster_type, keywords in YOLO_DISASTER_CLASSES.items():
+                            if any(keyword in label for keyword in keywords):
+                                disaster_detections.append({
+                                    'label': disaster_type,
+                                    'score': score,
+                                    'original_label': label,
+                                    'box': pred.get('box', {}),
+                                    'timestamp': current_time
+                                })
+                                break
+                    
+                    analysis_result = {
+                        'predictions': predictions,
+                        'disaster_detections': disaster_detections,
+                        'total_objects': len(predictions),
+                        'disasters_found': len(disaster_detections),
+                        'timestamp': current_time
+                    }
+                    
+                    detection_history.append(analysis_result)
+                    hf_result = analysis_result
+                    
+                    # Обновляем latest_log для быстрого доступа
+                    if disaster_detections:
+                        main_disaster = disaster_detections[0]
+                        latest_log = {
+                            "disasters": len(disaster_detections),
+                            "type": main_disaster['label'],
+                            "confidence": main_disaster['score'],
+                            "total_objects": len(predictions),
+                            "timestamp": current_time,
+                            "status": "ok"
+                        }
+                    else:
+                        latest_log = {
+                            "disasters": 0,
+                            "type": "none",
+                            "confidence": 0.0,
+                            "total_objects": len(predictions),
+                            "timestamp": current_time,
+                            "status": "ok"
+                        }
+                    
+                    # Отправляем лог в WebSocket
                     await add_log(
                         disasters_found=len(disaster_detections),
-                        disaster_type=main_disaster['label'],
-                        confidence=main_disaster['score'],
+                        disaster_type=latest_log["type"],
+                        confidence=latest_log["confidence"],
                         total_objects=len(predictions)
                     )
+                    
                 else:
-                    await add_log(
-                        disasters_found=0,
-                        total_objects=len(predictions)
-                    )
-                
-            else:
-                logger.error(f"❌ HF API ошибка: {resp.status_code}")
-                hf_result = {"error": f"HF API error: {resp.status_code}"}
-                
-        except Exception as e:
-            logger.error(f"❌ Ошибка HF анализа: {e}")
-            hf_result = {"error": str(e)}
+                    logger.error(f"❌ HF API ошибка: {resp.status_code}")
+                    hf_result = {"error": f"HF API error: {resp.status_code}"}
+                    
+            except Exception as e:
+                logger.error(f"❌ Ошибка HF анализа: {e}")
+                hf_result = {"error": str(e)}
+        else:
+            # Пропускаем анализ, но обновляем latest_log временем
+            latest_log["timestamp"] = current_time
+            hf_result = {"skipped": True, "reason": "rate_limit"}
         
         return JSONResponse({
             "status": "ok", 
@@ -395,10 +455,10 @@ def get_logs():
 @app.get("/api/latest")
 def get_latest_log():
     """
-    Возвращает только последний лог (для экономии трафика)
+    Возвращает кешированный последний лог (мгновенно)
     """
     try:
-        if not detection_history:
+        if not latest_log:
             return {
                 "disasters": 0,
                 "type": "none",
@@ -408,26 +468,7 @@ def get_latest_log():
                 "status": "no_data"
             }
         
-        latest = detection_history[-1]
-        if latest.get('disaster_detections'):
-            main_disaster = latest['disaster_detections'][0]
-            return {
-                "disasters": latest['disasters_found'],
-                "type": main_disaster['label'],
-                "confidence": main_disaster['score'],
-                "total_objects": latest['total_objects'],
-                "timestamp": latest['timestamp'],
-                "status": "ok"
-            }
-        else:
-            return {
-                "disasters": 0,
-                "type": "none",
-                "confidence": 0.0,
-                "total_objects": latest.get('total_objects', 0),
-                "timestamp": latest['timestamp'],
-                "status": "ok"
-            }
+        return latest_log
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

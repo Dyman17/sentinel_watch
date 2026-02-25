@@ -120,6 +120,38 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       lcd.print("WS Disconnected");
       lcd.setCursor(0, 1);
       lcd.print("Reconnecting...");
+      while (true) {
+        unsigned long current_time = millis();
+        
+        // Проверяем ping каждые 20 секунд
+        if (current_time - last_ping_time > 20000) {
+          last_ping_time = current_time;
+          webSocket.sendTXT("pong");
+        }
+        
+        // Ждем сообщение с таймаутом
+        if (webSocket.available()) {
+          String data = webSocket.readString();
+          
+          // Обрабатываем ping
+          if (data == "ping") {
+            webSocket.sendTXT("pong");
+            last_ping_time = current_time;
+            continue;
+          }
+          
+          // Обрабатываем другие сообщения
+          if (data == "status") {
+            // Запрос статуса
+            webSocket.sendTXT("status");
+          } else if (data == "reset") {
+            // Сброс счетчиков
+            resetCounters();
+          }
+        }
+        
+        delay(100);
+      }
       break;
       
     case WStype_CONNECTED:
