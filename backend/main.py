@@ -8,7 +8,7 @@ import subprocess
 import shutil
 from pathlib import Path
 from typing import List
-from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +20,31 @@ import time
 # --- Настройка логов ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def convert_rgb565_to_rgb(rgb565_data, width, height):
+    """
+    Конвертирует RGB565 в RGB888
+    """
+    # Переформатируем в 2D массив uint16
+    rgb565_pixels = rgb565_data.view(dtype=np.uint16).reshape((height, width))
+    
+    # Извлекаем RGB компоненты
+    r5 = (rgb565_pixels >> 11) & 0x1F
+    g6 = (rgb565_pixels >> 5) & 0x3F
+    b5 = rgb565_pixels & 0x1F
+    
+    # Конвертируем в 8-bit
+    r8 = (r5 * 255 + 15) // 31
+    g8 = (g6 * 255 + 31) // 63
+    b8 = (b5 * 255 + 15) // 31
+    
+    # Создаем RGB массив
+    rgb_array = np.zeros((height, width, 3), dtype=np.uint8)
+    rgb_array[:, :, 0] = r8
+    rgb_array[:, :, 1] = g8
+    rgb_array[:, :, 2] = b8
+    
+    return rgb_array
 
 # --- FastAPI и CORS ---
 app = FastAPI(title="SENTINEL.SAT - AI Disaster Monitoring System", version="1.0.0")
@@ -243,18 +268,30 @@ def build_frontend():
         raise
 
 @app.post("/api/upload-frame")
-async def upload_frame(file: UploadFile = File(...)):
+async def upload_frame(request: Request):
     """
-    Принимает кадр от ESP32, стримит на фронт и отправляет на HuggingFace
+    Принимает кадр от ESP32 (JPEG или RGB565), стримит на фронт и отправляет на HuggingFace
     """
     try:
-        # Читаем кадр
-        img_bytes = await file.read()
-        logger.info(f"📸 Получен кадр от ESP32: {len(img_bytes)} байт")
+        # Получаем заголовки от ESP32
+        width = int(request.headers.get("X-Width", "320"))
+        height = int(request.headers.get("X-Height", "240"))
+        format_type = request.headers.get("X-Format", "JPEG").upper()
         
-        # Конвертируем в numpy для обработки
-        frame = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        frame_np = np.array(frame)
+        # Читаем бинарные данные
+        img_bytes = await request.body()
+        logger.info(f"📸 Получен кадр от ESP32: {len(img_bytes)} байт, формат: {format_type}, размер: {width}x{height}")
+        
+        # Обрабатываем в зависимости от формата
+        if format_type == "RGB565":
+            # Конвертируем RGB565 в RGB
+            frame_np = np.frombuffer(img_bytes, dtype=np.uint8)
+            frame_rgb = convert_rgb565_to_rgb(frame_np, width, height)
+            frame = Image.fromarray(frame_rgb, 'RGB')
+        else:
+            # JPEG - стандартная обработка
+            frame = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            frame_rgb = np.array(frame)
         
         # --- Отправляем на фронт ---
         try:
@@ -276,9 +313,14 @@ async def upload_frame(file: UploadFile = File(...)):
             logger.info("🤖 Starting HF analysis...")
             
             try:
+                # Конвертируем в JPEG для отправки в HF
+                hf_output = io.BytesIO()
+                frame.save(hf_output, format="JPEG", quality=85)
+                hf_bytes = hf_output.getvalue()
+                
                 resp = requests.post(
                     HF_API_URL,
-                    files={"data": ("frame.jpg", img_bytes, "image/jpeg")},
+                    files={"data": ("frame.jpg", hf_bytes, "image/jpeg")},
                     headers={"Authorization": HF_TOKEN},
                     timeout=10
                 )
