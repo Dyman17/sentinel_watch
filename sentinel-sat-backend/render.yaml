@@ -1,0 +1,14 @@
+services:
+  # SENTINEL.SAT Backend + Frontend
+  # Runtime: Python
+  # Build Command: ./render-build.sh
+  # Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
+  
+  # Environment Variables (set in Render dashboard):
+  # HF_TOKEN=Bearer YOUR_HUGGINGFACE_TOKEN
+  # ESP_STREAM_URL=http://your-esp32-ip:81/stream
+  # SUPABASE_URL=your_supabase_url
+  # SUPABASE_KEY=your_supabase_key
+  
+  # Health Check Path: /api/health
+  # Auto-Deploy: yes

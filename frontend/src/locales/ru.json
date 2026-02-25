@@ -1,0 +1,41 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "online": "Онлайн",
+    "offline": "Офлайн"
+  },
+  "events": {
+    "wildfire": "Лесной пожар",
+    "flood": "Наводнение", 
+    "earthquake": "Землетрясение",
+    "smoke": "Задымление",
+    "deforestation": "Вырубка лесов",
+    "new_fire": "🔥 Новый очаг пожара обнаружен в {{region}}",
+    "new_flood": "💧 Наводнение обнаружено в {{region}}",
+    "new_earthquake": "🏛️ Землетрясение в {{region}}",
+    "satellite_online": "🛰️ Спутник в сети",
+    "critical_alert": "🚨 КРИТИЧЕСКАЯ ТРЕВОГА"
+  },
+  "logs": {
+    "title": "Лента событий",
+    "no_logs": "Нет логов",
+    "waiting": "Ожидание событий...",
+    "auto_scroll": "Автоскролл",
+    "clear": "Очистить",
+    "filter": "Фильтр"
+  },
+  "map": {
+    "legend": "Типы событий",
+    "loading_events": "Загрузка событий..."
+  },
+  "satellite": {
+    "control": "Управление спутником",
+    "id": "ID",
+    "mode": "Режим",
+    "status": "Статус",
+    "auto": "АВТО",
+    "manual": "РУЧНОЙ"
+  }
+}

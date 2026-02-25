@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: sentinel-watch
+    env: python
+    buildCommand: |
+      pip install -r requirements.txt
+      cd frontend && npm install && npm run build
+      mkdir -p ../static && cp -r dist/* ../static/
+    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: yes
+    envVars:
+      - key: HF_TOKEN
+        sync: false
+      - key: ESP_STREAM_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false

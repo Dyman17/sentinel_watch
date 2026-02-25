@@ -1,0 +1,265 @@
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* SENTINEL.SAT Space Theme */
+    --background: 220 20% 4%;
+    --background-secondary: 220 26% 9%;
+    --background-panel: 220 26% 12%;
+    --foreground: 210 40% 96%;
+    
+    --card: 220 26% 9%;
+    --card-foreground: 210 40% 96%;
+    
+    --popover: 220 26% 12%;
+    --popover-foreground: 210 40% 96%;
+    
+    /* Primary - Orange Accent */
+    --primary: 16 107 53; /* #FF6B35 */
+    --primary-foreground: 220 20% 4%;
+    
+    /* Secondary - Panel */
+    --secondary: 220 26% 16%;
+    --secondary-foreground: 210 40% 96%;
+    
+    --muted: 220 20% 18%;
+    --muted-foreground: 215 20% 55%;
+    
+    --accent: 220 26% 20%;
+    --accent-foreground: 210 40% 96%;
+    
+    /* Status Colors */
+    --success: 142 71% 45%;
+    --success-foreground: 220 20% 4%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 20% 4%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --info: 16 107 53; /* #FF6B35 */
+    --info-foreground: 220 20% 4%;
+    
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 16 107 53; /* #FF6B35 */
+    
+    --radius: 0.5rem;
+    
+    /* Glow Effects */
+    --glow-success: 0 0 20px hsl(142 71% 45% / 0.4), 0 0 40px hsl(142 71% 45% / 0.2);
+    --glow-warning: 0 0 20px hsl(38 92% 50% / 0.4), 0 0 40px hsl(38 92% 50% / 0.2);
+    --glow-destructive: 0 0 20px hsl(0 84% 60% / 0.4), 0 0 40px hsl(0 84% 60% / 0.2);
+    --glow-info: 0 0 20px hsl(16 107 53 / 0.4), 0 0 40px hsl(16 107 53 / 0.2);
+    --glow-primary: 0 0 20px hsl(16 107 53 / 0.3), 0 0 60px hsl(16 107 53 / 0.15);
+    
+    /* Typography */
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    
+    /* Sidebar */
+    --sidebar-background: 220 26% 9%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 16 107 53; /* #FF6B35 */
+    --sidebar-primary-foreground: 220 20% 4%;
+    --sidebar-accent: 220 26% 16%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 16 107 53; /* #FF6B35 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply scroll-smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    font-family: var(--font-body);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply font-semibold tracking-tight;
+  }
+  
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  /* Glass Panel Effect */
+  .glass-panel {
+    @apply bg-background-panel/80 backdrop-blur-xl border border-border/50 rounded-lg;
+  }
+  
+  /* Glow Effects */
+  .glow-success {
+    box-shadow: var(--glow-success);
+  }
+  
+  .glow-warning {
+    box-shadow: var(--glow-warning);
+  }
+  
+  .glow-destructive {
+    box-shadow: var(--glow-destructive);
+  }
+  
+  .glow-info {
+    box-shadow: var(--glow-info);
+  }
+  
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+  
+  /* Pulsing Animation */
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  /* Scanning Line Effect */
+  @keyframes scan-line {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100%);
+    }
+  }
+  
+  .scan-line {
+    animation: scan-line 3s linear infinite;
+  }
+  
+  /* Orbit Animation */
+  @keyframes orbit {
+    from {
+      stroke-dashoffset: 1000;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  .orbit-path {
+    stroke-dasharray: 10, 5;
+    animation: orbit 20s linear infinite;
+  }
+  
+  /* Status Indicator */
+  .status-indicator {
+    @apply relative;
+  }
+  
+  .status-indicator::before {
+    content: '';
+    @apply absolute inset-0 rounded-full animate-ping;
+  }
+  
+  .status-indicator.online::before {
+    @apply bg-success/40;
+  }
+  
+  .status-indicator.warning::before {
+    @apply bg-warning/40;
+  }
+  
+  .status-indicator.alert::before {
+    @apply bg-destructive/40;
+  }
+  
+  /* Grid Pattern Background */
+  .grid-pattern {
+    background-image: 
+      linear-gradient(to right, hsl(var(--border) / 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  
+  /* Noise Texture Overlay */
+  .noise-overlay {
+    position: relative;
+  }
+  
+  .noise-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    pointer-events: none;
+  }
+  
+  /* Telemetry Text Effect */
+  .telemetry-text {
+    @apply font-mono text-xs tracking-wider uppercase;
+    text-shadow: 0 0 10px currentColor;
+  }
+  
+  /* Scroll Area Styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-background-secondary rounded-full;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full hover:bg-muted-foreground/30;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  
+  .font-body {
+    font-family: var(--font-body);
+  }
+  
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  
+  .text-shadow-glow {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+  
+  .bg-gradient-radial {
+    background: radial-gradient(ellipse at center, var(--tw-gradient-from), var(--tw-gradient-to));
+  }
+}
