@@ -3,8 +3,8 @@ title: SENTINEL.SAT AI Disaster Detection
 emoji: 🛰️
 colorFrom: red
 colorTo: yellow
-sdk: gradio
-sdk_version: "4.19.2"
+sdk: fastapi
+sdk_version: "0.104.0"
 python_version: "3.10"
 app_file: app.py
 pinned: false

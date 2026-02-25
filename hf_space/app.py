@@ -1,4 +1,3 @@
-import gradio as gr
 import requests
 import numpy as np
 from PIL import Image
@@ -9,6 +8,9 @@ import os
 import torch
 from transformers import pipeline
 from huggingface_hub import hf_hub_download
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import uvicorn
 
 # --- Конфигурация ---
 SENTINEL_SERVER_URL = os.getenv("SENTINEL_SERVER_URL", "https://sentinel-sat.onrender.com")
@@ -249,31 +251,74 @@ with gr.Blocks(title="SENTINEL.SAT - HuggingFace Space", theme=gr.themes.Soft())
         outputs=[status_text]
     )
 
-# --- API эндпоинт для внешних запросов ---
-@app.post("/api/predict")
-async def predict_api(image):
+# --- FastAPI приложение ---
+app = FastAPI(title="SENTINEL.SAT AI API", version="1.0.0")
+
+@app.get("/")
+async def root():
+    return {"message": "SENTINEL.SAT AI Disaster Detection API", "status": "running"}
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "model_loaded": object_detector is not None,
+        "device": "cuda" if torch.cuda.is_available() else "cpu"
+    }
+
+@app.post("/predict")
+async def predict(request: Request):
     """
-    API эндпоинт для SENTINEL.SAT сервера
+    Принимает изображение и возвращает детекции
     """
     try:
-        result_text, processed_image = analyze_image(image)
+        # Получаем данные изображения
+        img_data = await request.body()
         
-        # Возвращаем JSON результат
-        return {
-            "status": "success",
-            "predictions": simulate_yolo_detection(image),
-            "timestamp": time.time(),
-            "hf_space": True
+        # Конвертируем в PIL Image
+        image = Image.open(io.BytesIO(img_data)).convert("RGB")
+        
+        # Анализируем с реальной моделью
+        predictions = real_yolo_detection(image)
+        
+        # Обрабатываем результаты
+        disasters_found = 0
+        disaster_type = None
+        confidence = 0.0
+        
+        for pred in predictions:
+            label = pred['label'].lower()
+            for disaster, keywords in YOLO_DISASTER_CLASSES.items():
+                if any(keyword in label for keyword in keywords):
+                    disasters_found += 1
+                    disaster_type = disaster
+                    confidence = max(confidence, pred['score'])
+                    break
+        
+        # Формируем результат
+        result = {
+            "predictions": predictions,
+            "disasters_found": disasters_found,
+            "disaster_type": disaster_type,
+            "confidence": confidence,
+            "timestamp": time.time()
         }
+        
+        # Отправляем на сервер SENTINEL.SAT
+        try:
+            response = requests.post(
+                f"{SENTINEL_SERVER_URL}/api/hf-results",
+                json=result,
+                timeout=5
+            )
+            print(f"📨 Results sent to server: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error sending to server: {e}")
+        
+        return result
+        
     except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        return {"error": str(e), "predictions": [], "disasters_found": 0}
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=True
-    )
+    uvicorn.run(app, host="0.0.0.0", port=7860)
