@@ -356,6 +356,81 @@ async def receive_hf_results(data: dict):
             "message": str(e)
         }, status_code=500)
 
+@app.get("/api/logs")
+def get_logs():
+    """
+    HTTP API для ESP32-Logger - возвращает последние логи
+    """
+    try:
+        # Берем последние 10 записей из истории
+        recent_logs = []
+        for detection in detection_history[-10:]:
+            if detection.get('disaster_detections'):
+                main_disaster = detection['disaster_detections'][0]
+                recent_logs.append({
+                    "disasters": detection['disasters_found'],
+                    "type": main_disaster['label'],
+                    "confidence": main_disaster['score'],
+                    "total_objects": detection['total_objects'],
+                    "timestamp": detection['timestamp']
+                })
+            else:
+                recent_logs.append({
+                    "disasters": 0,
+                    "type": "none",
+                    "confidence": 0.0,
+                    "total_objects": detection.get('total_objects', 0),
+                    "timestamp": detection['timestamp']
+                })
+        
+        return {
+            "status": "ok",
+            "logs": recent_logs,
+            "total_detections": len(detection_history),
+            "server_status": "running"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/latest")
+def get_latest_log():
+    """
+    Возвращает только последний лог (для экономии трафика)
+    """
+    try:
+        if not detection_history:
+            return {
+                "disasters": 0,
+                "type": "none",
+                "confidence": 0.0,
+                "total_objects": 0,
+                "timestamp": time.time(),
+                "status": "no_data"
+            }
+        
+        latest = detection_history[-1]
+        if latest.get('disaster_detections'):
+            main_disaster = latest['disaster_detections'][0]
+            return {
+                "disasters": latest['disasters_found'],
+                "type": main_disaster['label'],
+                "confidence": main_disaster['score'],
+                "total_objects": latest['total_objects'],
+                "timestamp": latest['timestamp'],
+                "status": "ok"
+            }
+        else:
+            return {
+                "disasters": 0,
+                "type": "none",
+                "confidence": 0.0,
+                "total_objects": latest.get('total_objects', 0),
+                "timestamp": latest['timestamp'],
+                "status": "ok"
+            }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.post("/api/upload")
 async def upload_image(file: UploadFile = File(...)):
     """
