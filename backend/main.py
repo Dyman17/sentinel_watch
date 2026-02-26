@@ -541,59 +541,6 @@ def get_status():
     }
 
 # --- Статика и фронтенд ---
-# Монтируем static только если директория существует (создаётся в startup)
-@app.post("/api/upload")
-async def upload_image(file: UploadFile = File(...)):
-    """
-    Загрузить фото и отправить в YOLO для анализа (временно используем фейк-ответы)
-    """
-    global latest_detection
-
-    try:
-        contents = await file.read()
-        frame = Image.open(io.BytesIO(contents))
-
-        # Используем фейк YOLO ответ
-        hf_result = random.choice(FAKE_YOLO_RESPONSES).copy()
-        predictions = hf_result.get('predictions', [])
-        disaster_detections = []
-
-        for pred in predictions:
-            label = pred.get('label', '').lower()
-            score = pred.get('score', 0)
-            for dtype, keywords in YOLO_DISASTER_CLASSES.items():
-                if any(kw in label for kw in keywords):
-                    disaster_detections.append({
-                        'label': dtype,
-                        'score': score,
-                        'original_label': label
-                    })
-                    break
-
-        latest_detection = {
-            "station_id": 1,
-            "disaster_type": disaster_detections[0]['label'] if disaster_detections else "none",
-            "confidence": disaster_detections[0]['score'] if disaster_detections else 0,
-            "timestamp": time.time()
-        }
-
-        hf_result['disaster_detections'] = disaster_detections
-
-        return JSONResponse({
-            "status": "ok",
-            "file_name": file.filename,
-            "hf_analysis": hf_result,
-            "latest_detection": latest_detection,
-            "note": "🤖 Using demo YOLO responses (waiting for HF Space deployment)"
-        })
-
-    except Exception as e:
-        logger.error(f"Upload error: {e}")
-        return JSONResponse({
-            "status": "error",
-            "message": str(e)
-        }, status_code=400)
-
 
 @app.get("/api/demo/stations")
 async def get_demo_stations():
@@ -679,10 +626,6 @@ async def get_esp32_logs(limit: int = 50):
         logger.error(f"Get ESP32 logs error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
-
-@app.get("/api/health", include_in_schema=False)
-async def health_check():
-    return {"status": "ok"}
 
 @app.get("/{full_path:path}", include_in_schema=False)
 def serve_spa(full_path: str):
