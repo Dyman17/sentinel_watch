@@ -113,7 +113,7 @@ YOLO_DISASTER_CLASSES = {
 # --- Глобальные переменные ---
 latest_log = {}
 last_analysis_time = 0
-ANALYSIS_INTERVAL = 3.0
+ANALYSIS_INTERVAL = 10.0  # Анализируем каждые 10 секунд
 last_ping_time = {}
 PING_INTERVAL = 20.0
 detection_history = []
@@ -122,6 +122,10 @@ MAX_HISTORY = 100
 # --- ESP32 логи ---
 esp32_logs = []
 MAX_ESP32_LOGS = 200
+
+# --- Последний кадр для анализа ---
+latest_frame = None
+latest_frame_lock = asyncio.Lock()
 
 # --- Async HTTP клиент (не блокирует event loop) ---
 http_client: httpx.AsyncClient = None
@@ -132,9 +136,14 @@ async def startup():
     http_client = httpx.AsyncClient(timeout=10.0)
     # Создаём static директорию если не существует
     STATIC_DIR.mkdir(exist_ok=True)
-    logger.info(f"SENTINEL.SAT server started")
-    logger.info(f"HF API URL: {HF_API_URL}")
-    logger.info(f"Static dir: {STATIC_DIR}")
+    logger.info(f"🚀 SENTINEL.SAT server started")
+    logger.info(f"📊 HF API URL: {HF_API_URL}")
+    logger.info(f"📁 Static dir: {STATIC_DIR}")
+    logger.info(f"⏱️ Analysis interval: {ANALYSIS_INTERVAL} seconds")
+
+    # === ЗАПУСКАЕМ ПЕРИОДИЧЕСКИЙ АНАЛИЗ ===
+    asyncio.create_task(periodic_frame_analysis())
+    logger.info(f"✅ Periodic frame analysis started (every {ANALYSIS_INTERVAL}s)")
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -262,13 +271,22 @@ async def stream():
                 clients.remove(q)
     return StreamingResponse(generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
-async def analyze_frame_background(frame, current_time):
-    """Анализируем фрейм в фоне (не блокируя ответ)"""
-    global last_analysis_time
+async def periodic_frame_analysis():
+    """Анализируем новейший кадр каждые 10 секунд"""
+    global latest_frame
 
-    try:
-        if (current_time - last_analysis_time) > ANALYSIS_INTERVAL:
-            last_analysis_time = current_time
+    while True:
+        try:
+            await asyncio.sleep(ANALYSIS_INTERVAL)
+
+            async with latest_frame_lock:
+                if latest_frame is None:
+                    logger.debug("No frame to analyze yet")
+                    continue
+                frame = latest_frame
+
+            current_time = time.time()
+            logger.info(f"📊 Analyzing latest frame from queue (HF API)...")
 
             if HF_TOKEN and http_client:
                 try:
@@ -288,7 +306,7 @@ async def analyze_frame_background(frame, current_time):
 
                     if resp.status_code == 200:
                         hf_result = resp.json()
-                        logger.info(f"HF analysis OK: {hf_result}")
+                        logger.info(f"✅ HF analysis OK: {hf_result}")
 
                         predictions = hf_result.get('predictions', [])
                         disaster_detections = []
@@ -319,55 +337,41 @@ async def analyze_frame_background(frame, current_time):
                         if len(detection_history) > MAX_HISTORY:
                             detection_history.pop(0)
 
-                        hf_result = analysis_result
-
                         if disaster_detections:
                             main_disaster = disaster_detections[0]
-                            latest_log = {
-                                "disasters": len(disaster_detections),
-                                "type": main_disaster['label'],
-                                "confidence": main_disaster['score'],
-                                "total_objects": len(predictions),
-                                "timestamp": current_time,
-                                "status": "ok"
-                            }
-                        else:
-                            latest_log = {
-                                "disasters": 0,
-                                "type": "none",
-                                "confidence": 0.0,
-                                "total_objects": len(predictions),
-                                "timestamp": current_time,
-                                "status": "ok"
-                            }
-
-                        await add_log(
-                            disasters_found=len(disaster_detections),
-                            disaster_type=latest_log["type"],
-                            confidence=latest_log["confidence"],
-                            total_objects=len(predictions)
-                        )
+                            await add_log(
+                                disasters_found=len(disaster_detections),
+                                disaster_type=main_disaster['label'],
+                                confidence=main_disaster['score'],
+                                total_objects=len(predictions)
+                            )
                     else:
-                        logger.error(f"HF API error: {resp.status_code}")
+                        logger.error(f"❌ HF API error: {resp.status_code}")
 
                 except Exception as e:
-                    logger.error(f"HF analysis error: {e}")
-    except Exception as e:
-        logger.error(f"Background analysis error: {e}")
+                    logger.error(f"❌ HF analysis error: {e}")
+            else:
+                logger.warning("⚠️ HF_TOKEN not configured")
+
+        except Exception as e:
+            logger.error(f"❌ Periodic analysis error: {e}")
+            await asyncio.sleep(1)  # Не спамим логи при ошибке
 
 
 @app.post("/api/upload-frame")
 async def upload_frame(request: Request):
     """
-    Быстро отправить фрейм на фронт, потом анализировать в фоне
+    📡 2 FPS видеопоток: СРАЗУ на фронт
+    📊 10 сек анализ: берём новейший кадр для HF (каждые 10 секунд)
     """
+    global latest_frame
+
     try:
         width = int(request.headers.get("X-Width", "320"))
         height = int(request.headers.get("X-Height", "240"))
         format_type = request.headers.get("X-Format", "JPEG").upper()
 
         img_bytes = await request.body()
-        logger.info(f"Frame from ESP32: {len(img_bytes)} bytes, format: {format_type}")
 
         if format_type == "RGB565":
             frame_np = np.frombuffer(img_bytes, dtype=np.uint8)
@@ -376,7 +380,11 @@ async def upload_frame(request: Request):
         else:
             frame = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-        # === СРАЗУ ОТПРАВЛЯЕМ НА ФРОНТ ===
+        # === СОХРАНЯЕМ НОВЕЙШИЙ КАДР ДЛЯ АНАЛИЗА ===
+        async with latest_frame_lock:
+            latest_frame = frame
+
+        # === СРАЗУ ОТПРАВЛЯЕМ НА ФРОНТ (2 FPS видео) ===
         try:
             output = io.BytesIO()
             frame.save(output, format="JPEG", quality=85)
@@ -385,10 +393,7 @@ async def upload_frame(request: Request):
         except Exception as e:
             logger.error(f"Broadcast error: {e}")
 
-        # === HF АНАЛИЗ В ФОНЕ (НЕ ЖДЁМ ОТВЕТА) ===
-        asyncio.create_task(analyze_frame_background(frame, time.time()))
-
-        # === СРАЗУ ОТВЕТ ===
+        # === СРАЗУ ОТВЕТ (без ожидания HF) ===
         return JSONResponse({
             "status": "ok",
             "message": "Frame received",
