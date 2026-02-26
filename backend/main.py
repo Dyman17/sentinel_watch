@@ -785,6 +785,53 @@ async def esp32_status():
         }
 
 
+@app.get("/api/esp32/log")
+async def esp32_log():
+    """
+    Simple log endpoint for ESP32
+    Returns latest detection/alert as simple JSON string
+
+    Response: {"log":"AI: person detected (87%)"}
+
+    ESP32 should ping this every 2 seconds
+    """
+    try:
+        log_message = ""
+
+        # Check for latest high-priority client detection (65%+)
+        if client_detections:
+            for detection in reversed(client_detections):
+                high_conf = [d for d in detection["detections"] if d["score"] > 0.65]
+                if high_conf:
+                    d = high_conf[0]
+                    log_message = f"AI: {d['class'].upper()} detected ({int(d['score'] * 100)}%)"
+                    break
+
+        # If no client detection, check for latest server disaster
+        if not log_message and detection_history:
+            latest = detection_history[-1]
+            if latest.get("disasters_found", 0) > 0:
+                disaster_type = latest.get("disaster_type", "UNKNOWN")
+                confidence = latest.get("max_confidence", 0)
+                log_message = f"DISASTER: {disaster_type.upper()} ({int(confidence * 100)}%)"
+
+        # If still no detection, return OK status
+        if not log_message:
+            log_message = "AI: Monitoring... No alerts"
+
+        return {
+            "log": log_message,
+            "timestamp": int(time.time() * 1000)
+        }
+
+    except Exception as e:
+        logger.error(f"ESP32 log error: {str(e)}")
+        return {
+            "log": f"ERROR: {str(e)}",
+            "timestamp": int(time.time() * 1000)
+        }
+
+
 @app.get("/{full_path:path}", include_in_schema=False)
 def serve_spa(full_path: str):
     # Только блокируем явно неправильные API пути
