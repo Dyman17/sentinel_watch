@@ -120,6 +120,10 @@ PING_INTERVAL = 20.0
 detection_history = []
 MAX_HISTORY = 100
 
+# --- ESP32 логи ---
+esp32_logs = []
+MAX_ESP32_LOGS = 200
+
 # --- Async HTTP клиент (не блокирует event loop) ---
 http_client: httpx.AsyncClient = None
 
@@ -170,6 +174,20 @@ async def broadcast_frame(frame_bytes: bytes):
             await queue.put(frame_bytes)
         except:
             pass
+
+async def add_esp32_log(message: str, level: str = "INFO", device_id: str = "ESP32-1"):
+    """Add a log from ESP32 device"""
+    global esp32_logs
+    log_entry = {
+        "device_id": device_id,
+        "level": level,
+        "message": message,
+        "timestamp": time.time()
+    }
+    esp32_logs.append(log_entry)
+    if len(esp32_logs) > MAX_ESP32_LOGS:
+        esp32_logs.pop(0)
+    logger.info(f"[{device_id}] {level}: {message}")
 
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
@@ -620,6 +638,47 @@ async def get_demo_latest():
         "station_id": random.randint(1, 3),
         "station_name": random.choice([s["name"] for s in DEMO_STATIONS])
     }
+
+
+@app.post("/api/logs/esp32")
+async def receive_esp32_log(data: dict):
+    """
+    Receive logs from ESP32 device
+    Expected: {"message": "...", "level": "INFO", "device_id": "ESP32-1"}
+    """
+    try:
+        message = data.get("message", "")
+        level = data.get("level", "INFO")
+        device_id = data.get("device_id", "ESP32-1")
+
+        await add_esp32_log(message, level, device_id)
+
+        return {
+            "status": "success",
+            "message": "Log received",
+            "total_logs": len(esp32_logs)
+        }
+    except Exception as e:
+        logger.error(f"ESP32 log error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.get("/api/logs/esp32")
+async def get_esp32_logs(limit: int = 50):
+    """
+    Get recent ESP32 logs
+    """
+    try:
+        recent_logs = esp32_logs[-limit:] if limit else esp32_logs
+        return {
+            "status": "ok",
+            "logs": recent_logs,
+            "total_logs": len(esp32_logs),
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        logger.error(f"Get ESP32 logs error: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 
 @app.on_event("startup")

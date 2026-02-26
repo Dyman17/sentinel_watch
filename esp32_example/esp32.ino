@@ -4,6 +4,7 @@
 #include <SocketIOclient.h>
 #include <ArduinoJson.h>
 #include <LiquidCrystal_I2C.h>
+#include <HTTPClient.h>
 
 // --- WiFi настройки ---
 const char* ssid = "BB";           // Твоя WiFi сеть
@@ -40,7 +41,7 @@ LogData current_log = {0, "", 0.0, 0, ""};
 void setup() {
   Serial.begin(115200);
   Serial.println("🛰️ SENTINEL.SAT ESP32 Logger Starting...");
-  
+
   // Инициализация LCD
   lcd.init();
   lcd.backlight();
@@ -48,8 +49,12 @@ void setup() {
   lcd.print("SENTINEL.SAT");
   lcd.setCursor(0, 1);
   lcd.print("Logger v1.0");
-  
+
   delay(2000);
+
+  // Подождём перед попыткой отправки логов
+  delay(3000);
+  sendLogToServer("🛰️ SENTINEL.SAT ESP32 Logger started - v1.0", "INFO");
   
   // Подключаемся к WiFi
   WiFi.begin(ssid, password);
@@ -77,12 +82,16 @@ void setup() {
     Serial.println("\n✅ WiFi connected!");
     Serial.print("📡 IP address: ");
     Serial.println(WiFi.localIP());
-    
+
     lcd.clear();
     lcd.print("WiFi Connected");
     lcd.setCursor(0, 1);
     lcd.print(WiFi.localIP());
-    
+
+    // Отправляем лог на сервер
+    delay(1000);
+    sendLogToServer("WiFi connected - IP: " + WiFi.localIP().toString(), "SUCCESS");
+
     // Настраиваем WebSocket
     setupWebSocket();
   } else {
@@ -91,6 +100,9 @@ void setup() {
     lcd.print("WiFi Failed!");
     lcd.setCursor(0, 1);
     lcd.print("Check Settings");
+
+    // Отправляем лог на сервер (потом, когда будет WiFi)
+    sendLogToServer("Failed to connect to WiFi after 30 attempts", "ERROR");
   }
   
   Serial.println("🛰️ SENTINEL.SAT ESP32 Logger Ready!");
@@ -117,35 +129,38 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_DISCONNECTED:
       Serial.println("🔌 WebSocket disconnected");
       connected = false;
+      sendLogToServer("WebSocket disconnected, attempting to reconnect", "WARNING");
       lcd.clear();
       lcd.print("WS Disconnected");
       lcd.setCursor(0, 1);
       lcd.print("Reconnecting...");
       // Бесконечный цикл удален - reconnect handled by webSocket.setReconnectInterval()
       break;
-      
+
     case WStype_CONNECTED:
       Serial.println("🔌 WebSocket connected");
       connected = true;
+      sendLogToServer("WebSocket connected to SENTINEL.SAT server", "SUCCESS");
       lcd.clear();
       lcd.print("WS Connected");
       lcd.setCursor(0, 1);
       lcd.print("Waiting logs...");
       break;
-      
+
     case WStype_TEXT:
       Serial.printf("📨 Received: %s\n", payload);
       processLogMessage((char*)payload);
       break;
-      
+
     case WStype_BIN:
       Serial.println("📨 Binary message received");
       break;
-      
+
     case WStype_ERROR:
       Serial.println("❌ WebSocket error");
+      sendLogToServer("WebSocket error occurred", "ERROR");
       break;
-      
+
     default:
       break;
   }
@@ -155,25 +170,26 @@ void processLogMessage(char* payload) {
   // Парсим JSON сообщение
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, payload);
-  
+
   if (error) {
     Serial.printf("❌ JSON parse error: %s\n", error.c_str());
+    sendLogToServer("JSON parse error received from server", "WARNING");
     return;
   }
-  
+
   // Извлекаем данные
   current_log.disasters_found = doc["disasters_found"] | 0;
   current_log.total_objects = doc["total_objects"] | 0;
   current_log.confidence = doc["confidence"] | 0.0;
   current_log.disaster_type = doc["disaster_type"] | "";
   current_log.timestamp = doc["timestamp"] | "";
-  
-  Serial.printf("🚨 Disasters: %d, Objects: %d, Type: %s\n", 
+
+  Serial.printf("🚨 Disasters: %d, Objects: %d, Type: %s\n",
     current_log.disasters_found, current_log.total_objects, current_log.disaster_type.c_str());
-  
+
   // Обновляем LCD
   updateDisplay();
-  
+
   // Если найдены катастрофы - выводим сигнал
   if (current_log.disasters_found > 0) {
     alertDisaster();
@@ -208,7 +224,12 @@ void updateDisplay() {
 
 void alertDisaster() {
   Serial.println("🚨🚨🚨 DISASTER ALERT! 🚨🚨🚨");
-  
+
+  // Отправляем лог на сервер
+  String logMsg = "🚨 DISASTER DETECTED: " + current_log.disaster_type +
+                  " (confidence: " + String(current_log.confidence * 100, 1) + "%)";
+  sendLogToServer(logMsg, "ERROR");
+
   // Мигаем LCD подсветкой
   for (int i = 0; i < 5; i++) {
     lcd.noBacklight();
@@ -216,7 +237,7 @@ void alertDisaster() {
     lcd.backlight();
     delay(200);
   }
-  
+
   // Показываем детекцию
   lcd.clear();
   lcd.print("🚨 DISASTER!");
@@ -244,6 +265,18 @@ void loop() {
     Serial.printf("Disasters: %d\n", current_log.disasters_found);
     Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
     Serial.println("==============");
+
+    // Отправляем статус лог на сервер
+    String statusMsg = "Status - WiFi: " +
+                       String(WiFi.status() == WL_CONNECTED ? "OK" : "FAIL") +
+                       ", WS: " +
+                       String(connected ? "OK" : "FAIL") +
+                       ", Heap: " +
+                       String(ESP.getFreeHeap()) +
+                       "B, Disasters: " +
+                       String(current_log.disasters_found);
+    sendLogToServer(statusMsg, "INFO");
+
     last_status = millis();
   }
   
@@ -264,4 +297,38 @@ void resetCounters() {
   current_log.disaster_type = "";
   current_log.confidence = 0.0;
   updateDisplay();
+}
+
+// --- Функция для отправки логов на сервер ---
+void sendLogToServer(String message, String level = "INFO") {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+
+    // URL бэкенда
+    String url = "https://sentinel-sat.onrender.com/api/logs/esp32";
+
+    // Создаём JSON
+    DynamicJsonDocument doc(256);
+    doc["message"] = message;
+    doc["level"] = level;
+    doc["device_id"] = "ESP32-CAM-1";
+
+    String json;
+    serializeJson(doc, json);
+
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    int httpCode = http.POST(json);
+
+    if (httpCode == 200) {
+      Serial.printf("✅ Log sent: %s\n", message.c_str());
+    } else {
+      Serial.printf("❌ Log send failed (HTTP %d): %s\n", httpCode, message.c_str());
+    }
+
+    http.end();
+  } else {
+    Serial.println("❌ WiFi not connected, log not sent");
+  }
 }

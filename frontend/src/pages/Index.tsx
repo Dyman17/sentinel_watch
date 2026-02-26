@@ -4,6 +4,7 @@ import { SimpleStream } from "@/components/dashboard/SimpleStream";
 import { MapView } from "@/components/dashboard/MapView";
 import ThreeSourceUpload from "@/components/dashboard/ThreeSourceUpload";
 import AIStatus from "@/components/dashboard/AIStatus";
+import ESP32Logs from "@/components/dashboard/ESP32Logs";
 import { Button } from "@/components/ui/button";
 import { Camera, BarChart3, Map, Upload, Brain } from "lucide-react";
 
@@ -20,11 +21,9 @@ const Index = () => {
       case 'logs':
         return (
           <div className="flex-1 p-4">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold mb-4">Логи системы</h2>
-              <p className="text-muted-foreground">
-                Здесь будет отображаться подробная история событий системы
-              </p>
+            <div className="max-w-6xl mx-auto">
+              <h2 className="text-2xl font-bold mb-4">📡 System Logs</h2>
+              <ESP32Logs />
             </div>
           </div>
         );
