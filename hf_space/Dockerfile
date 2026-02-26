@@ -1,18 +1,24 @@
-# Используем официальный Python образ
 FROM python:3.11-slim
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем requirements и устанавливаем зависимости
+# Install system dependencies for OpenCV
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxcb1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем приложение
+# Copy application
 COPY . .
 
-# Открываем порт для Gradio
+# HF Spaces expects port 7860
 EXPOSE 7860
 
-# Запускаем приложение
 CMD ["python", "app.py"]
