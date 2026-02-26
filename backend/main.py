@@ -4,6 +4,7 @@ import uvicorn
 import asyncio
 import numpy as np
 import httpx
+import random
 from pathlib import Path
 from typing import List
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, Request
@@ -48,6 +49,47 @@ HF_API_URL = os.getenv(
     "https://Dyman17-sentinel-watch.hf.space/predict"
 )
 HF_TOKEN = os.getenv("HF_TOKEN", "")
+
+# --- Demo Data ---
+DEMO_STATIONS = [
+    {"id": 1, "name": "Северное Бутово", "lat": 55.3485, "lon": 37.7449},
+    {"id": 2, "name": "Центр (Кремль)", "lat": 55.7525, "lon": 37.6231},
+    {"id": 3, "name": "ЮАО (Царицыно)", "lat": 55.6204, "lon": 37.7383}
+]
+
+latest_detection = {
+    "station_id": 1,
+    "disaster_type": "No detection",
+    "confidence": 0,
+    "timestamp": time.time()
+}
+
+# Фейк YOLO детекции для демо
+FAKE_YOLO_RESPONSES = [
+    {
+        "predictions": [
+            {"label": "fire", "score": 0.92, "box": {"xmin": 100, "ymin": 50, "xmax": 300, "ymax": 250}},
+            {"label": "smoke", "score": 0.85, "box": {"xmin": 80, "ymin": 40, "xmax": 320, "ymax": 200}}
+        ]
+    },
+    {
+        "predictions": [
+            {"label": "flood", "score": 0.88, "box": {"xmin": 50, "ymin": 100, "xmax": 400, "ymax": 350}},
+            {"label": "water", "score": 0.91, "box": {"xmin": 60, "ymin": 110, "xmax": 390, "ymax": 340}}
+        ]
+    },
+    {
+        "predictions": [
+            {"label": "smoke", "score": 0.78, "box": {"xmin": 150, "ymin": 50, "xmax": 350, "ymax": 200}}
+        ]
+    },
+    {
+        "predictions": []  # No detection
+    },
+    {
+        "predictions": []  # No detection
+    }
+]
 
 # --- Пути ---
 STATIC_DIR = Path(__file__).parent / "static"
@@ -483,6 +525,103 @@ def get_status():
 
 # --- Статика и фронтенд ---
 # Монтируем static только если директория существует (создаётся в startup)
+@app.post("/api/upload")
+async def upload_image(file: UploadFile = File(...)):
+    """
+    Загрузить фото и отправить в YOLO для анализа (временно используем фейк-ответы)
+    """
+    global latest_detection
+
+    try:
+        contents = await file.read()
+        frame = Image.open(io.BytesIO(contents))
+
+        # Используем фейк YOLO ответ
+        hf_result = random.choice(FAKE_YOLO_RESPONSES).copy()
+        predictions = hf_result.get('predictions', [])
+        disaster_detections = []
+
+        for pred in predictions:
+            label = pred.get('label', '').lower()
+            score = pred.get('score', 0)
+            for dtype, keywords in YOLO_DISASTER_CLASSES.items():
+                if any(kw in label for kw in keywords):
+                    disaster_detections.append({
+                        'label': dtype,
+                        'score': score,
+                        'original_label': label
+                    })
+                    break
+
+        latest_detection = {
+            "station_id": 1,
+            "disaster_type": disaster_detections[0]['label'] if disaster_detections else "none",
+            "confidence": disaster_detections[0]['score'] if disaster_detections else 0,
+            "timestamp": time.time()
+        }
+
+        hf_result['disaster_detections'] = disaster_detections
+
+        return JSONResponse({
+            "status": "ok",
+            "file_name": file.filename,
+            "hf_analysis": hf_result,
+            "latest_detection": latest_detection,
+            "note": "🤖 Using demo YOLO responses (waiting for HF Space deployment)"
+        })
+
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        }, status_code=400)
+
+
+@app.get("/api/demo/stations")
+async def get_demo_stations():
+    """
+    Вернуть список демо станций с фейк-данными
+    """
+    import random
+    stations = []
+    for station in DEMO_STATIONS:
+        # Фейк детекции
+        disaster_types = ["fire", "flood", "smoke", "none", "none"]
+        disaster = random.choice(disaster_types)
+        confidence = random.uniform(0.5, 0.95) if disaster != "none" else 0
+        color = "#FF0000" if confidence > 0.7 else "#FFC107" if confidence > 0.3 else "#4CAF50"
+
+        stations.append({
+            **station,
+            "current_detection": {
+                "disaster_type": disaster,
+                "confidence": round(confidence, 2),
+                "color": color
+            },
+            "last_update": time.time()
+        })
+    return {"stations": stations, "count": len(stations)}
+
+
+@app.get("/api/demo/latest")
+async def get_demo_latest():
+    """
+    Вернуть фейк последнее обнаружение
+    """
+    disasters = ["fire", "flood", "smoke", "none"]
+    disaster = random.choice(disasters)
+    confidence = random.uniform(0.6, 0.98) if disaster != "none" else 0
+
+    return {
+        "type": disaster,
+        "confidence": round(confidence, 2),
+        "timestamp": time.time(),
+        "station_id": random.randint(1, 3),
+        "station_name": random.choice([s["name"] for s in DEMO_STATIONS])
+    }
+
+
 @app.on_event("startup")
 async def mount_static():
     if STATIC_DIR.exists():

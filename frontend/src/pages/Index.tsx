@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TopBar } from "@/components/dashboard/TopBar";
 import { SimpleStream } from "@/components/dashboard/SimpleStream";
 import { MapView } from "@/components/dashboard/MapView";
-import ImageUpload from "@/components/dashboard/ImageUpload";
+import ThreeSourceUpload from "@/components/dashboard/ThreeSourceUpload";
 import AIStatus from "@/components/dashboard/AIStatus";
 import { Button } from "@/components/ui/button";
 import { Camera, BarChart3, Map, Upload, Brain } from "lucide-react";
@@ -16,7 +16,7 @@ const Index = () => {
       case 'status':
         return <AIStatus />;
       case 'upload':
-        return <ImageUpload />;
+        return <ThreeSourceUpload />;
       case 'logs':
         return (
           <div className="flex-1 p-4">
