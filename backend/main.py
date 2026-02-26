@@ -564,7 +564,7 @@ async def get_demo_stations():
         disaster_types = ["fire", "flood", "smoke", "none", "none"]
         disaster = random.choice(disaster_types)
         confidence = random.uniform(0.5, 0.95) if disaster != "none" else 0
-        color = "#FF0000" if confidence > 0.7 else "#FFC107" if confidence > 0.3 else "#4CAF50"
+        color = "#FF0000" if confidence > 0.65 else "#FFC107" if confidence > 0.3 else "#4CAF50"
 
         stations.append({
             **station,
@@ -668,8 +668,8 @@ async def receive_client_detections(data: dict):
         if len(client_detections) > 100:
             client_detections.pop(0)
 
-        # Check for high-priority objects (person)
-        high_priority = [d for d in detections if d["class"] in ["person"] and d["score"] > 0.7]
+        # Check for high-priority objects (person) - 65% confidence
+        high_priority = [d for d in detections if d["class"] in ["person"] and d["score"] > 0.65]
 
         if high_priority:
             # Send alert to ESP32 via WebSocket
@@ -700,6 +700,89 @@ async def get_client_detections(limit: int = 50):
         "detections": client_detections[-limit:] if client_detections else [],
         "total": len(client_detections)
     }
+
+
+@app.get("/api/esp32/status")
+async def esp32_status():
+    """
+    ESP32 polling endpoint - returns latest detections and alerts
+    ESP32 should call this every 5-10 seconds
+
+    Response format:
+    {
+        "status": "success",
+        "server_time": 1234567890,
+        "latest_detection": {
+            "type": "person",
+            "confidence": 0.87,
+            "source": "client|server",
+            "timestamp": 1234567890
+        },
+        "alerts": [
+            {"type": "person", "count": 2, "confidence": 0.75}
+        ],
+        "disaster_count": 3,
+        "total_detections": 156
+    }
+    """
+    try:
+        # Get latest client detection (65%+ confidence)
+        latest_client = None
+        if client_detections:
+            for detection in reversed(client_detections):
+                high_conf = [d for d in detection["detections"] if d["score"] > 0.65]
+                if high_conf:
+                    latest_client = {
+                        "type": high_conf[0]["class"],
+                        "confidence": round(high_conf[0]["score"], 2),
+                        "source": "client",
+                        "timestamp": detection["timestamp"]
+                    }
+                    break
+
+        # Get latest server detection from detection_history
+        latest_server = None
+        if detection_history:
+            latest = detection_history[-1]
+            if latest.get("disasters_found", 0) > 0:
+                latest_server = {
+                    "type": latest.get("disaster_type", "unknown"),
+                    "confidence": latest.get("max_confidence", 0),
+                    "source": "server",
+                    "timestamp": latest.get("timestamp", int(time.time() * 1000))
+                }
+
+        # Determine which detection to report (prefer high-confidence)
+        latest_detection = latest_client or latest_server
+
+        # Get high-priority alerts (65%+ confidence)
+        alerts = []
+        if client_detections:
+            latest_cd = client_detections[-1]
+            high_priority = [d for d in latest_cd["detections"] if d["score"] > 0.65]
+            for d in high_priority:
+                alerts.append({
+                    "type": d["class"],
+                    "confidence": round(d["score"], 2),
+                    "count": 1
+                })
+
+        return {
+            "status": "success",
+            "server_time": int(time.time()),
+            "latest_detection": latest_detection,
+            "alerts": alerts,
+            "disaster_count": len([d for d in detection_history if d.get("disasters_found", 0) > 0]),
+            "total_detections": len(detection_history),
+            "client_detection_count": len(client_detections)
+        }
+    except Exception as e:
+        logger.error(f"ESP32 status error: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "server_time": int(time.time())
+        }
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
