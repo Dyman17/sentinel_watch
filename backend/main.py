@@ -637,6 +637,71 @@ async def get_esp32_logs(limit: int = 50):
         return {"status": "error", "message": str(e)}, 500
 
 
+# Store client-side detections
+client_detections = []
+
+
+@app.post("/api/client-detections")
+async def receive_client_detections(data: dict):
+    """
+    Receive real-time object detections from frontend TensorFlow.js
+    Format: {
+        "detections": [
+            {"class": "person", "score": 0.95, "bbox": [x, y, w, h]},
+            ...
+        ],
+        "timestamp": 1234567890
+    }
+    """
+    try:
+        timestamp = data.get("timestamp", int(time.time() * 1000))
+        detections = data.get("detections", [])
+
+        # Store latest client detections
+        client_detections.append({
+            "detections": detections,
+            "timestamp": timestamp,
+            "source": "client"
+        })
+
+        # Keep only last 100 entries
+        if len(client_detections) > 100:
+            client_detections.pop(0)
+
+        # Check for high-priority objects (person)
+        high_priority = [d for d in detections if d["class"] in ["person"] and d["score"] > 0.7]
+
+        if high_priority:
+            # Send alert to ESP32 via WebSocket
+            alert_message = {
+                "type": "client_detection",
+                "objects": [d["class"] for d in high_priority],
+                "count": len(high_priority),
+                "timestamp": timestamp
+            }
+            await broadcast_log(alert_message)
+
+        logger.info(f"Received client detections: {len(detections)} objects, {len(high_priority)} high-priority")
+        return {
+            "status": "success",
+            "received": len(detections),
+            "alerts_sent": len(high_priority)
+        }
+    except Exception as e:
+        logger.error(f"Error processing client detections: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/client-detections")
+async def get_client_detections(limit: int = 50):
+    """Get recent client-side detections"""
+    return {
+        "status": "success",
+        "detections": client_detections[-limit:] if client_detections else [],
+        "total": len(client_detections)
+    }
+
+
 @app.get("/{full_path:path}", include_in_schema=False)
 def serve_spa(full_path: str):
     # Только блокируем явно неправильные API пути

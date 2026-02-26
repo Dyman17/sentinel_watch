@@ -100,6 +100,23 @@ class ApiClient {
     })
   }
 
+  async sendClientDetections(detections: any[]): Promise<{ status: string; received: number; alerts_sent: number }> {
+    return this.request('/api/client-detections', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        detections: detections.map(d => ({
+          class: d.class,
+          score: d.score,
+          bbox: d.bbox
+        })),
+        timestamp: Date.now()
+      })
+    })
+  }
+
   createWebSocketConnection(): WebSocket {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsHost = this.baseUrl ? new URL(this.baseUrl).host : window.location.host

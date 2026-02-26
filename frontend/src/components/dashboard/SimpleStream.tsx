@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { 
-  Camera, 
-  Satellite, 
-  Settings, 
-  Activity, 
-  Clock 
+import {
+  Camera,
+  Satellite,
+  Settings,
+  Activity,
+  Clock
 } from "lucide-react";
+import * as cocoSsd from "@tensorflow-models/coco-ssd";
+import apiClient from "@/lib/api";
 
 // Particle Background Component
 const ParticleBackground = () => {
@@ -128,6 +130,14 @@ export const SimpleStream = () => {
   const [latencyMs, setLatencyMs] = useState(2000);
   const [frameTimestamp, setFrameTimestamp] = useState<number | null>(null);
 
+  // Client-side YOLO detection
+  const videoRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null);
+  const [clientDetections, setClientDetections] = useState<any[]>([]);
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [modelLoading, setModelLoading] = useState(true);
+
   // API base URL from environment
   const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -212,6 +222,102 @@ export const SimpleStream = () => {
 
     return () => clearInterval(timer);
   }, [frameTimestamp]);
+
+  // Load COCO-SSD model on mount
+  useEffect(() => {
+    const loadModel = async () => {
+      try {
+        console.log('Loading COCO-SSD model...');
+        const loadedModel = await cocoSsd.load();
+        setModel(loadedModel);
+        setModelLoading(false);
+        console.log('✅ COCO-SSD model loaded successfully');
+      } catch (error) {
+        console.error('❌ Failed to load COCO-SSD model:', error);
+        setModelLoading(false);
+      }
+    };
+    loadModel();
+  }, []);
+
+  // Detection function
+  const detectObjects = async () => {
+    if (!model || !videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    try {
+      // Match canvas size to video
+      canvas.width = video.naturalWidth || video.width;
+      canvas.height = video.naturalHeight || video.height;
+
+      // Run detection
+      const predictions = await model.detect(video);
+
+      // Clear previous drawings
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw bounding boxes
+      predictions.forEach(prediction => {
+        const [x, y, width, height] = prediction.bbox;
+
+        // Draw box
+        ctx.strokeStyle = '#00ff00'; // Green
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, width, height);
+
+        // Draw label background
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(x, y - 25, width, 25);
+
+        // Draw label text
+        ctx.fillStyle = '#000000';
+        ctx.font = '16px Arial';
+        ctx.fillText(
+          `${prediction.class} ${Math.round(prediction.score * 100)}%`,
+          x + 5,
+          y - 7
+        );
+      });
+
+      // Store detections
+      setClientDetections(predictions);
+
+      // Send to backend if detections found
+      if (predictions.length > 0) {
+        sendClientDetections(predictions);
+      }
+    } catch (error) {
+      console.error('Detection error:', error);
+    }
+  };
+
+  // Send client detections to backend
+  const sendClientDetections = async (predictions: any[]) => {
+    try {
+      await apiClient.sendClientDetections(predictions);
+    } catch (error) {
+      console.error('Failed to send client detections:', error);
+    }
+  };
+
+  // Continuous detection loop (every 500ms for ~2 FPS)
+  useEffect(() => {
+    if (!model) return;
+
+    detectionIntervalRef.current = setInterval(() => {
+      detectObjects();
+    }, 500);
+
+    return () => {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
+    };
+  }, [model]);
 
   // Auto-refresh data
   useEffect(() => {
@@ -355,6 +461,35 @@ export const SimpleStream = () => {
           </CardHeader>
           <CardContent>
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+              {/* Base MJPEG stream */}
+              <img
+                ref={videoRef}
+                src={streamUrl}
+                alt="Video Stream"
+                className="w-full h-full object-cover"
+                onLoad={() => {
+                  setFrameTimestamp(Date.now());
+                  setIsLoading(false);
+                  detectObjects();
+                }}
+                onError={(e) => {
+                  e.currentTarget.src = '';
+                  setIsLoading(false);
+                }}
+                crossOrigin="anonymous"
+                style={{
+                  background: 'linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%)',
+                  backgroundSize: '20px 20px',
+                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                }}
+              />
+
+              {/* Canvas overlay for bounding boxes */}
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none"
+              />
+
               {/* Латентность таймер */}
               {frameTimestamp && (
                 <div className="absolute top-2 right-2 z-10 bg-black/60 text-white px-3 py-2 rounded-lg font-mono text-sm">
@@ -370,24 +505,15 @@ export const SimpleStream = () => {
                 </div>
               )}
 
-              <img
-                src={streamUrl}
-                alt="Video Stream"
-                className="w-full h-full object-cover"
-                onLoad={() => {
-                  setFrameTimestamp(Date.now());
-                  setIsLoading(false);
-                }}
-                onError={(e) => {
-                  e.currentTarget.src = '';
-                  setIsLoading(false);
-                }}
-                style={{
-                  background: 'linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%)',
-                  backgroundSize: '20px 20px',
-                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-                }}
-              />
+              {/* Model loading indicator */}
+              {modelLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
+                  <div className="text-center text-white">
+                    <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <div className="text-sm">Загрузка модели...</div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -401,57 +527,83 @@ export const SimpleStream = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {/* Обнаруженные объекты */}
+            <div className="space-y-4">
+              {/* Real-time Client Detections */}
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-gray-500 uppercase">Объекты:</div>
-                {latestResult?.full_log?.detections?.length > 0 ? (
+                <div className="text-xs font-semibold text-cyan-500 uppercase">⚡ Реальное время (TensorFlow):</div>
+                {clientDetections.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
-                    {latestResult.full_log.detections.map((detection: any, index: number) => (
-                      <div key={index} className="flex flex-col gap-1 p-2 bg-green-950/30 border border-green-900/50 rounded text-xs">
-                        <span className="font-medium text-green-400">{detection.label}</span>
-                        <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5">
-                          {(detection.score * 100).toFixed(0)}%
+                    {clientDetections.slice(0, 4).map((detection: any, index: number) => (
+                      <div key={index} className="flex flex-col gap-1 p-2 bg-cyan-950/40 border border-cyan-900/50 rounded text-xs">
+                        <span className="font-medium text-cyan-400">{detection.class}</span>
+                        <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5 bg-cyan-600">
+                          {Math.round(detection.score * 100)}%
                         </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded">
-                    Объектов не обнаружено
+                    Загрузка детектора...
                   </div>
                 )}
               </div>
 
-              {/* Катастрофы */}
+              {/* Server Analysis */}
               <div className="space-y-2 pt-2 border-t border-gray-700">
-                <div className="text-xs font-semibold text-gray-500 uppercase">🚨 Катастрофы:</div>
-                {latestResult?.full_log?.disaster_detections?.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {latestResult.full_log.disaster_detections.map((disaster: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-red-950/40 border border-red-900/50 rounded text-xs">
-                        <span className="font-bold text-red-400">{disaster.label}</span>
-                        <Badge className="bg-red-600 text-white text-xs px-1.5 py-0.5">
-                          {(disaster.score * 100).toFixed(0)}%
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded">
-                    ✅ Катастроф не обнаружено
-                  </div>
-                )}
+                <div className="text-xs font-semibold text-green-500 uppercase">📡 Анализ (HuggingFace):</div>
+
+                {/* Обнаруженные объекты */}
+                <div className="space-y-1.5">
+                  <div className="text-xs font-semibold text-gray-400 uppercase">Объекты:</div>
+                  {latestResult?.full_log?.detections?.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {latestResult.full_log.detections.map((detection: any, index: number) => (
+                        <div key={index} className="flex flex-col gap-1 p-2 bg-green-950/30 border border-green-900/50 rounded text-xs">
+                          <span className="font-medium text-green-400">{detection.label}</span>
+                          <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5">
+                            {(detection.score * 100).toFixed(0)}%
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500 p-1 bg-gray-900/20 rounded">
+                      Объектов не обнаружено
+                    </div>
+                  )}
+                </div>
+
+                {/* Катастрофы */}
+                <div className="space-y-1.5 pt-2 border-t border-gray-600">
+                  <div className="text-xs font-semibold text-red-500 uppercase">🚨 Катастрофы:</div>
+                  {latestResult?.full_log?.disaster_detections?.length > 0 ? (
+                    <div className="space-y-1">
+                      {latestResult.full_log.disaster_detections.map((disaster: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-red-950/40 border border-red-900/50 rounded text-xs">
+                          <span className="font-bold text-red-400">{disaster.label}</span>
+                          <Badge className="bg-red-600 text-white text-xs px-1.5 py-0.5">
+                            {(disaster.score * 100).toFixed(0)}%
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500 p-1 bg-gray-900/20 rounded">
+                      ✅ Катастроф не обнаружено
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Статистика */}
               {latestResult && (
                 <div className="text-xs text-gray-400 pt-2 border-t border-gray-700 space-y-1">
-                  <div>📊 Всего объектов: <span className="font-bold text-white">{latestResult.full_log?.detections?.length || 0}</span></div>
+                  <div>📊 Объекты (HF): <span className="font-bold text-white">{latestResult.full_log?.detections?.length || 0}</span></div>
+                  <div>⚡ Реальное: <span className="font-bold text-cyan-400">{clientDetections.length}</span></div>
                   <div>⏱️ Время: <span className="text-gray-300 font-mono text-xs">
                     {latestResult.timestamp ? new Date(latestResult.timestamp).toLocaleTimeString('ru-RU') : 'N/A'}
                   </span></div>
-                  {latestResult.source && <div>📍 Источник: <span className="text-gray-300">{latestResult.source}</span></div>}
                 </div>
               )}
             </div>
