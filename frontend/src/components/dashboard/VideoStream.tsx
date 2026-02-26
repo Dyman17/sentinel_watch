@@ -84,7 +84,8 @@ export function VideoStream({ streamId = "STREAM-SAT-01", satelliteId = "SAT-01"
     try {
       setConnectionStatus('connecting');
       
-      const wsUrl = `ws://localhost:8000/api/v1/live`;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/v1/live`;
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {

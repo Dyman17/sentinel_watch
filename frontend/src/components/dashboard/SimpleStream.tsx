@@ -125,7 +125,7 @@ export const SimpleStream = () => {
   const [error, setError] = useState<string | null>(null);
   
   // API base URL from environment
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
   // Fetch latest analysis result
   const fetchLatest = async () => {

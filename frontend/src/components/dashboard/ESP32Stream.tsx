@@ -33,7 +33,7 @@ interface DetectionResult {
 export function ESP32Stream() {
   const [config, setConfig] = useState<StreamConfig>({
     espUrl: 'http://192.168.1.100:81/stream',
-    backendUrl: 'http://localhost:8000',
+    backendUrl: '',
     isActive: false
   });
   
