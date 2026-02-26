@@ -684,35 +684,28 @@ async def get_esp32_logs(limit: int = 50):
 @app.on_event("startup")
 async def mount_static():
     if STATIC_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+        app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=False), name="static")
 
-@app.get("/")
-def serve_frontend():
-    index_path = STATIC_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(str(index_path))
-    return JSONResponse({
-        "service": "SENTINEL.SAT API",
-        "status": "running",
-        "endpoints": {
-            "upload_frame": "POST /api/upload-frame",
-            "stream": "GET /api/stream",
-            "health": "GET /api/health",
-            "logs": "GET /api/logs",
-            "latest": "GET /api/latest",
-            "upload": "POST /api/upload",
-            "websocket": "WS /ws/logs"
-        }
-    })
+@app.get("/api/health", include_in_schema=False)
+async def health_check():
+    return {"status": "ok"}
 
-@app.get("/{full_path:path}")
+@app.get("/{full_path:path}", include_in_schema=False)
 def serve_spa(full_path: str):
     # Не перехватываем API пути
     if full_path.startswith("api/") or full_path.startswith("ws/"):
         return JSONResponse({"error": "Not found"}, status_code=404)
+
+    # Пытаемся найти файл в static директории
+    file_path = STATIC_DIR / full_path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(str(file_path))
+
+    # Если файл не найден и это не API, служим index.html для SPA routing
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
+
     return JSONResponse({"error": "Not found"}, status_code=404)
 
 if __name__ == "__main__":
