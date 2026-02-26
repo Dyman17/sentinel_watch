@@ -33,13 +33,6 @@ SENTINEL.SAT — это система мониторинга и раннего 
 
 ---
 
-## � Контакты
-
-· **Email**: team@sentinel-sat.com  
-· **GitHub Issues**: [сообщить о проблеме](https://github.com/Dyman17/sentinel-watch/issues)
-
----
-
 <div align="center">
 
 **🛰️ SENTINEL.SAT - Защитим будущее вместе!**
