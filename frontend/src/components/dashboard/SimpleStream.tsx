@@ -12,6 +12,9 @@ import {
   Activity,
   Clock
 } from "lucide-react";
+import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-backend-webgl";
+import "@tensorflow/tfjs-backend-cpu";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import apiClient from "@/lib/api";
 
@@ -227,7 +230,18 @@ export const SimpleStream = () => {
   useEffect(() => {
     const loadModel = async () => {
       try {
-        console.log('Loading COCO-SSD model...');
+        console.log('🚀 Initializing TensorFlow.js...');
+
+        // Explicitly set backend (try WebGL first, fallback to CPU)
+        try {
+          await tf.setBackend('webgl');
+          console.log('✅ Using WebGL backend');
+        } catch (e) {
+          console.warn('⚠️ WebGL not available, using CPU backend');
+          await tf.setBackend('cpu');
+        }
+
+        console.log('📥 Loading COCO-SSD model...');
         const loadedModel = await cocoSsd.load();
         setModel(loadedModel);
         setModelLoading(false);
