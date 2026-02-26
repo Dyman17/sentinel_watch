@@ -262,38 +262,11 @@ async def stream():
                 clients.remove(q)
     return StreamingResponse(generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
-@app.post("/api/upload-frame")
-async def upload_frame(request: Request):
-    global latest_log, last_analysis_time
+async def analyze_frame_background(frame, current_time):
+    """Анализируем фрейм в фоне (не блокируя ответ)"""
+    global last_analysis_time
 
     try:
-        width = int(request.headers.get("X-Width", "320"))
-        height = int(request.headers.get("X-Height", "240"))
-        format_type = request.headers.get("X-Format", "JPEG").upper()
-
-        img_bytes = await request.body()
-        logger.info(f"Frame from ESP32: {len(img_bytes)} bytes, format: {format_type}")
-
-        if format_type == "RGB565":
-            frame_np = np.frombuffer(img_bytes, dtype=np.uint8)
-            frame_rgb = convert_rgb565_to_rgb(frame_np, width, height)
-            frame = Image.fromarray(frame_rgb, 'RGB')
-        else:
-            frame = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-
-        # --- Стрим на фронт ---
-        try:
-            output = io.BytesIO()
-            frame.save(output, format="JPEG", quality=85)
-            jpeg_bytes = output.getvalue()
-            await broadcast_frame(jpeg_bytes)
-        except Exception as e:
-            logger.error(f"Broadcast error: {e}")
-
-        # --- HF анализ с rate limiting ---
-        current_time = time.time()
-        hf_result = {"skipped": True, "reason": "rate_limit"}
-
         if (current_time - last_analysis_time) > ANALYSIS_INTERVAL:
             last_analysis_time = current_time
 
@@ -309,7 +282,8 @@ async def upload_frame(request: Request):
                         headers={
                             "Authorization": f"Bearer {HF_TOKEN}",
                             "Content-Type": "image/jpeg"
-                        }
+                        },
+                        timeout=30.0
                     )
 
                     if resp.status_code == 200:
@@ -375,18 +349,49 @@ async def upload_frame(request: Request):
                         )
                     else:
                         logger.error(f"HF API error: {resp.status_code}")
-                        hf_result = {"error": f"HF API error: {resp.status_code}"}
 
                 except Exception as e:
                     logger.error(f"HF analysis error: {e}")
-                    hf_result = {"error": str(e)}
-            else:
-                hf_result = {"skipped": True, "reason": "no_hf_token"}
+    except Exception as e:
+        logger.error(f"Background analysis error: {e}")
 
+
+@app.post("/api/upload-frame")
+async def upload_frame(request: Request):
+    """
+    Быстро отправить фрейм на фронт, потом анализировать в фоне
+    """
+    try:
+        width = int(request.headers.get("X-Width", "320"))
+        height = int(request.headers.get("X-Height", "240"))
+        format_type = request.headers.get("X-Format", "JPEG").upper()
+
+        img_bytes = await request.body()
+        logger.info(f"Frame from ESP32: {len(img_bytes)} bytes, format: {format_type}")
+
+        if format_type == "RGB565":
+            frame_np = np.frombuffer(img_bytes, dtype=np.uint8)
+            frame_rgb = convert_rgb565_to_rgb(frame_np, width, height)
+            frame = Image.fromarray(frame_rgb, 'RGB')
+        else:
+            frame = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+        # === СРАЗУ ОТПРАВЛЯЕМ НА ФРОНТ ===
+        try:
+            output = io.BytesIO()
+            frame.save(output, format="JPEG", quality=85)
+            jpeg_bytes = output.getvalue()
+            await broadcast_frame(jpeg_bytes)
+        except Exception as e:
+            logger.error(f"Broadcast error: {e}")
+
+        # === HF АНАЛИЗ В ФОНЕ (НЕ ЖДЁМ ОТВЕТА) ===
+        asyncio.create_task(analyze_frame_background(frame, time.time()))
+
+        # === СРАЗУ ОТВЕТ ===
         return JSONResponse({
             "status": "ok",
             "message": "Frame received",
-            "hf_result": hf_result,
             "frame_size": len(img_bytes),
             "clients_connected": len(clients)
         })
