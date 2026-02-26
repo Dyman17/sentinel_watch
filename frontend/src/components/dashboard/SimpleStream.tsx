@@ -17,6 +17,7 @@ import "@tensorflow/tfjs-backend-webgl";
 import "@tensorflow/tfjs-backend-cpu";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import apiClient from "@/lib/api";
+import { NASAMap } from "./NASAMap";
 
 // Particle Background Component
 const ParticleBackground = () => {
@@ -661,6 +662,23 @@ export const SimpleStream = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* NASA Map - Show only when NASA source is selected */}
+        {currentSource === 'nasa' && (
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Satellite className="w-5 h-5" />
+                  🛰️ NASA GIBS - Спутниковые данные
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NASAMap isVisible={currentSource === 'nasa'} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
       </div>
     </div>
