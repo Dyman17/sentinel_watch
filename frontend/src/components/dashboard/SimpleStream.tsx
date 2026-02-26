@@ -397,33 +397,61 @@ export const SimpleStream = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              Результаты анализа
+              🤖 AI Анализ
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {latestResult?.full_log?.detections?.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {latestResult.full_log.detections.map((detection: any, index: number) => (
-                    <div key={index} className="flex flex-col gap-1 p-3 bg-muted/30 rounded">
-                      <span className="text-sm font-medium">{detection.label}</span>
-                      <Badge variant="secondary" className="self-start">
-                        {(detection.score * 100).toFixed(1)}%
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-base text-muted-foreground text-center py-8">
-                  Детекций не найдено
-                </div>
-              )}
-              
+            <div className="space-y-3">
+              {/* Обнаруженные объекты */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-500 uppercase">Объекты:</div>
+                {latestResult?.full_log?.detections?.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {latestResult.full_log.detections.map((detection: any, index: number) => (
+                      <div key={index} className="flex flex-col gap-1 p-2 bg-green-950/30 border border-green-900/50 rounded text-xs">
+                        <span className="font-medium text-green-400">{detection.label}</span>
+                        <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5">
+                          {(detection.score * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded">
+                    Объектов не обнаружено
+                  </div>
+                )}
+              </div>
+
+              {/* Катастрофы */}
+              <div className="space-y-2 pt-2 border-t border-gray-700">
+                <div className="text-xs font-semibold text-gray-500 uppercase">🚨 Катастрофы:</div>
+                {latestResult?.full_log?.disaster_detections?.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {latestResult.full_log.disaster_detections.map((disaster: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-red-950/40 border border-red-900/50 rounded text-xs">
+                        <span className="font-bold text-red-400">{disaster.label}</span>
+                        <Badge className="bg-red-600 text-white text-xs px-1.5 py-0.5">
+                          {(disaster.score * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded">
+                    ✅ Катастроф не обнаружено
+                  </div>
+                )}
+              </div>
+
+              {/* Статистика */}
               {latestResult && (
-                <div className="text-sm text-muted-foreground pt-4 border-t">
-                  <div>Источник: {latestResult.source}</div>
-                  <div>Регион: {latestResult.full_log?.region || 'unknown'}</div>
-                  <div>Уверенность: {latestResult.full_log?.confidence ? (latestResult.full_log.confidence * 100).toFixed(1) : 0}%</div>
+                <div className="text-xs text-gray-400 pt-2 border-t border-gray-700 space-y-1">
+                  <div>📊 Всего объектов: <span className="font-bold text-white">{latestResult.full_log?.detections?.length || 0}</span></div>
+                  <div>⏱️ Время: <span className="text-gray-300 font-mono text-xs">
+                    {latestResult.timestamp ? new Date(latestResult.timestamp).toLocaleTimeString('ru-RU') : 'N/A'}
+                  </span></div>
+                  {latestResult.source && <div>📍 Источник: <span className="text-gray-300">{latestResult.source}</span></div>}
                 </div>
               )}
             </div>
