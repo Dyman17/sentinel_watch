@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import logging
@@ -681,11 +680,6 @@ async def get_esp32_logs(limit: int = 50):
         return {"status": "error", "message": str(e)}, 500
 
 
-@app.on_event("startup")
-async def mount_static():
-    if STATIC_DIR.exists():
-        app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=False), name="static")
-
 @app.get("/api/health", include_in_schema=False)
 async def health_check():
     return {"status": "ok"}
@@ -699,12 +693,32 @@ def serve_spa(full_path: str):
     # Пытаемся найти файл в static директории
     file_path = STATIC_DIR / full_path
     if file_path.exists() and file_path.is_file():
-        return FileResponse(str(file_path))
+        # Определяем правильный MIME type для разных файлов
+        suffix = file_path.suffix.lower()
+        media_type_map = {
+            '.js': 'application/javascript',
+            '.mjs': 'application/javascript',
+            '.css': 'text/css',
+            '.html': 'text/html',
+            '.json': 'application/json',
+            '.svg': 'image/svg+xml',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.ico': 'image/x-icon',
+            '.woff': 'font/woff',
+            '.woff2': 'font/woff2',
+            '.ttf': 'font/ttf',
+            '.eot': 'application/vnd.ms-fontobject',
+        }
+        media_type = media_type_map.get(suffix, 'application/octet-stream')
+        return FileResponse(str(file_path), media_type=media_type)
 
     # Если файл не найден и это не API, служим index.html для SPA routing
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(str(index_path))
+        return FileResponse(str(index_path), media_type='text/html')
 
     return JSONResponse({"error": "Not found"}, status_code=404)
 
