@@ -142,6 +142,10 @@ export const SimpleStream = () => {
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [modelLoading, setModelLoading] = useState(true);
 
+  // WebSocket frame streaming (low latency raw frames)
+  const wsRef = useRef<WebSocket | null>(null);
+  const [wsFrameUrl, setWsFrameUrl] = useState<string>('');
+
   // API base URL from environment
   const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -255,6 +259,55 @@ export const SimpleStream = () => {
     };
     loadModel();
   }, []);
+
+  // WebSocket frame streaming (low latency)
+  useEffect(() => {
+    if (currentSource !== 'esp') return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = API_BASE ? new URL(API_BASE).host : window.location.host;
+    const frameWsUrl = `${protocol}//${wsHost}/ws/frames`;
+
+    setWsFrameUrl(frameWsUrl);
+
+    const ws = new WebSocket(frameWsUrl);
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket frames connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'frame' && videoRef.current) {
+          // Display frame immediately
+          videoRef.current.src = `data:image/jpeg;base64,${message.data}`;
+          setFrameTimestamp(Date.now());
+          setIsLoading(false);
+          // Trigger detection on new frame
+          detectObjects();
+        }
+      } catch (error) {
+        console.error('Frame WebSocket error:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket frames disconnected');
+    };
+
+    wsRef.current = ws;
+
+    return () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, [currentSource, API_BASE]);
 
   // Detection function
   const detectObjects = async () => {
