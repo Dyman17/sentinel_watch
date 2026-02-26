@@ -130,8 +130,8 @@ export const SimpleStream = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Таймер задержки (для интерактива)
-  const [latencyMs, setLatencyMs] = useState(2000);
+  // Таймер анализа (10 сек для HF модели)
+  const [latencyMs, setLatencyMs] = useState(10000);
   const [frameTimestamp, setFrameTimestamp] = useState<number | null>(null);
 
   // Client-side YOLO detection
@@ -215,12 +215,13 @@ export const SimpleStream = () => {
     }
   };
 
-  // Таймер задержки (обновляется каждые 100мс)
+  // Таймер анализа (обновляется каждые 100мс)
+  // Отсчитывает 10 секунд пока идет анализ HF модели
   useEffect(() => {
     const timer = setInterval(() => {
       if (frameTimestamp) {
         const elapsed = Date.now() - frameTimestamp;
-        setLatencyMs(Math.max(0, 2000 - elapsed)); // 2 сек макс задержка
+        setLatencyMs(Math.max(0, 10000 - elapsed)); // 10 сек макс для HF анализа
       }
     }, 100);
 
@@ -527,6 +528,37 @@ export const SimpleStream = () => {
                     <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                     <div className="text-sm">Загрузка модели...</div>
                   </div>
+                </div>
+              )}
+
+              {/* Analysis Results Overlay */}
+              {latestResult && (
+                <div className="absolute bottom-2 left-2 right-2 z-10 bg-black/70 text-white p-3 rounded-lg text-xs max-h-32 overflow-y-auto border border-green-500/50">
+                  <div className="font-bold text-green-400 mb-2">📊 Анализ готов:</div>
+
+                  {/* Disasters */}
+                  {latestResult.full_log?.disaster_detections?.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-red-400 font-semibold mb-1">🚨 Катастрофы:</div>
+                      {latestResult.full_log.disaster_detections.slice(0, 2).map((d: any, i: number) => (
+                        <div key={i} className="text-red-300 ml-2">
+                          • {d.label}: {Math.round(d.score * 100)}%
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Objects */}
+                  {latestResult.full_log?.detections?.length > 0 && (
+                    <div>
+                      <div className="text-green-400 font-semibold mb-1">🎯 Объекты:</div>
+                      {latestResult.full_log.detections.slice(0, 3).map((d: any, i: number) => (
+                        <div key={i} className="text-green-300 ml-2">
+                          • {d.label}: {Math.round(d.score * 100)}%
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
