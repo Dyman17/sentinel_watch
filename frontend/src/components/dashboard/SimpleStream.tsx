@@ -117,7 +117,7 @@ interface LatestResult {
 
 export const SimpleStream = () => {
   const [currentSource, setCurrentSource] = useState<'esp' | 'nasa'>('esp');
-  const [streamUrl, setStreamUrl] = useState('http://localhost:8000/stream');
+  const [streamUrl, setStreamUrl] = useState(`${import.meta.env.VITE_API_BASE_URL || ''}/api/stream`);
   const [latestResult, setLatestResult] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -212,7 +212,7 @@ export const SimpleStream = () => {
 
   // Update stream URL based on source
   useEffect(() => {
-    setStreamUrl('http://localhost:8000/stream');
+    setStreamUrl(`${API_BASE}/api/stream`);
   }, [currentSource]);
 
   const getEventColor = (event: string) => {

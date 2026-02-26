@@ -3,9 +3,7 @@ title: SENTINEL.SAT AI Disaster Detection
 emoji: 🛰️
 colorFrom: red
 colorTo: yellow
-sdk: fastapi
-sdk_version: "0.104.0"
-python_version: "3.10"
+sdk: docker
 app_file: app.py
 pinned: false
 ---

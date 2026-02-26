@@ -1,14 +1,12 @@
-FROM python:3.11-slim
+FROM python:3.11
 
 WORKDIR /app
 
-# Install system dependencies for OpenCV
+# Install minimal system dependencies for OpenCV
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libxcb1 \
     libsm6 \
     libxext6 \
-    libxrender1 \
-    libgomp1 \
+    libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

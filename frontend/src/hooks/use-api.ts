@@ -1,16 +1,14 @@
 /**
- * 🛰️ React Query хуки для Catastrophe Watch API
+ * 🛰️ React Query хуки для SENTINEL.SAT API
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import apiClient, { 
-  type Event, 
-  type Satellite, 
-  type Statistics,
   type HealthStatus,
-  type Metrics
+  type LatestLog,
+  type AnalysisResult
 } from '@/lib/api'
 
 // Хук для получения здоровья системы
@@ -23,82 +21,33 @@ export function useHealth() {
   })
 }
 
-// Хук для получения метрик
-export function useMetrics() {
+// Хук для получения последних логов
+export function useLogs() {
   return useQuery({
-    queryKey: ['metrics'],
-    queryFn: () => apiClient.getMetrics(),
-    refetchInterval: 60000, // Обновляем каждую минуту
-    staleTime: 30000,
+    queryKey: ['logs'],
+    queryFn: () => apiClient.getLogs(),
+    refetchInterval: 5000, // Обновляем каждые 5 секунд
+    staleTime: 2000,
   })
 }
 
-// Хук для получения событий
-export function useEvents(params: {
-  limit?: number
-  severity?: string
-  event_type?: string
-  region?: string
-} = {}) {
+// Хук для получения последнего результата
+export function useLatest() {
   return useQuery({
-    queryKey: ['events', params],
-    queryFn: () => apiClient.getEvents(params),
-    refetchInterval: 30000, // Обновляем каждые 30 секунд
-    staleTime: 15000,
+    queryKey: ['latest'],
+    queryFn: () => apiClient.getLatest(),
+    refetchInterval: 3000, // Обновляем каждые 3 секунды
+    staleTime: 1000,
   })
 }
 
-// Хук для получения одного события
-export function useEvent(id: string) {
+// Хук для получения истории детекций
+export function useDetections() {
   return useQuery({
-    queryKey: ['event', id],
-    queryFn: () => apiClient.getEvent(id),
-    enabled: !!id,
-    staleTime: 60000, // Кэшируем на 1 минуту
-  })
-}
-
-// Хук для получения статистики
-export function useStatistics() {
-  return useQuery({
-    queryKey: ['statistics'],
-    queryFn: () => apiClient.getStatistics(),
-    refetchInterval: 60000, // Обновляем каждую минуту
-    staleTime: 30000,
-  })
-}
-
-// Хук для получения спутников
-export function useSatellites() {
-  return useQuery({
-    queryKey: ['satellites'],
-    queryFn: () => apiClient.getSatellites(),
-    refetchInterval: 30000, // Обновляем каждые 30 секунд
-    staleTime: 15000,
-  })
-}
-
-// Хук для получения одного спутника
-export function useSatellite(id: string) {
-  return useQuery({
-    queryKey: ['satellite', id],
-    queryFn: () => apiClient.getSatellite(id),
-    enabled: !!id,
-    staleTime: 60000,
-  })
-}
-
-// Хук для получения данных спутника
-export function useSatelliteData(satelliteId: string, params: {
-  limit?: number
-  start_date?: string
-  end_date?: string
-} = {}) {
-  return useQuery({
-    queryKey: ['satellite-data', satelliteId, params],
-    queryFn: () => apiClient.getSatelliteData(satelliteId, params),
-    enabled: !!satelliteId,
-    staleTime: 30000,
+    queryKey: ['detections'],
+    queryFn: () => apiClient.getDetections(),
+    refetchInterval: 10000, // Обновляем каждые 10 секунд
+    staleTime: 5000,
   })
 }
 
@@ -107,105 +56,17 @@ export function useUploadImage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ 
-      file, 
-      metadata 
-    }: { 
-      file: File
-      metadata: { latitude: number; longitude: number; altitude?: number; device_id?: string }
-    }) => apiClient.uploadImage(file, metadata),
+    mutationFn: (file: File) => apiClient.uploadImage(file),
     onSuccess: (data) => {
       toast.success('Изображение успешно загружено и проанализировано')
       
       // Инвалидируем связанные запросы
-      queryClient.invalidateQueries({ queryKey: ['events'] })
-      queryClient.invalidateQueries({ queryKey: ['statistics'] })
-      queryClient.invalidateQueries({ queryKey: ['metrics'] })
+      queryClient.invalidateQueries({ queryKey: ['logs'] })
+      queryClient.invalidateQueries({ queryKey: ['latest'] })
+      queryClient.invalidateQueries({ queryKey: ['detections'] })
     },
     onError: (error) => {
       toast.error(`Ошибка загрузки: ${error.message}`)
-    },
-  })
-}
-
-// Мутация для анализа base64 изображения
-export function useAnalyzeBase64Image() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (data: {
-      image_data: string
-      latitude: number
-      longitude: number
-      device_id?: string
-    }) => apiClient.analyzeBase64Image(data),
-    onSuccess: (data) => {
-      toast.success('Анализ изображения завершен')
-      
-      // Инвалидируем связанные запросы
-      queryClient.invalidateQueries({ queryKey: ['events'] })
-      queryClient.invalidateQueries({ queryKey: ['statistics'] })
-      queryClient.invalidateQueries({ queryKey: ['metrics'] })
-    },
-    onError: (error) => {
-      toast.error(`Ошибка анализа: ${error.message}`)
-    },
-  })
-}
-
-// Хук для получения последних событий
-export function useRecentEvents(hours: number = 24) {
-  return useQuery({
-    queryKey: ['recent-events', hours],
-    queryFn: () => apiClient.getRecentEvents(hours),
-    refetchInterval: 30000,
-    staleTime: 15000,
-  })
-}
-
-// Хук для получения событий по типу
-export function useEventsByType(eventType: string) {
-  return useQuery({
-    queryKey: ['events-by-type', eventType],
-    queryFn: () => apiClient.getEventsByType(eventType),
-    enabled: !!eventType,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  })
-}
-
-// Хук для получения критических событий
-export function useCriticalEvents() {
-  return useQuery({
-    queryKey: ['critical-events'],
-    queryFn: () => apiClient.getCriticalEvents(),
-    refetchInterval: 10000, // Обновляем каждые 10 секунд для критических событий
-    staleTime: 5000,
-  })
-}
-
-// Хук для симуляции ESP32 (для демонстрации)
-export function useSimulateESP32() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ 
-      imageData, 
-      coordinates 
-    }: { 
-      imageData: string
-      coordinates: { latitude: number; longitude: number }
-    }) => apiClient.simulateESP32Capture(imageData, coordinates),
-    onSuccess: (data) => {
-      toast.success('ESP32 симуляция выполнена успешно')
-      
-      // Инвалидируем связанные запросы
-      queryClient.invalidateQueries({ queryKey: ['events'] })
-      queryClient.invalidateQueries({ queryKey: ['statistics'] })
-      queryClient.invalidateQueries({ queryKey: ['metrics'] })
-    },
-    onError: (error) => {
-      toast.error(`Ошибка симуляции: ${error.message}`)
     },
   })
 }
@@ -228,13 +89,15 @@ export function useWebSocket() {
       try {
         const data = JSON.parse(event.data)
         
-        if (data.type === 'NEW_EVENT') {
-          toast.success(`Новое событие: ${data.payload.type}`)
+        // Обновляем данные при получении нового лога
+        if (data.disasters_found !== undefined) {
+          queryClient.invalidateQueries({ queryKey: ['logs'] })
+          queryClient.invalidateQueries({ queryKey: ['latest'] })
+          queryClient.invalidateQueries({ queryKey: ['detections'] })
           
-          // Инвалидируем запросы для обновления данных
-          queryClient.invalidateQueries({ queryKey: ['events'] })
-          queryClient.invalidateQueries({ queryKey: ['statistics'] })
-          queryClient.invalidateQueries({ queryKey: ['metrics'] })
+          if (data.disasters_found > 0) {
+            toast.warning(`Обнаружена катастрофа: ${data.disaster_type || 'Unknown'}`)
+          }
         }
       } catch (error) {
         console.error('WebSocket message error:', error)
