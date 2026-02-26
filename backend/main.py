@@ -99,6 +99,9 @@ clients: List[asyncio.Queue] = []
 # --- WebSocket клиенты для логов ---
 log_clients: List[WebSocket] = []
 
+# --- WebSocket клиенты для сырых фреймов (без анализа) ---
+frame_clients: List[WebSocket] = []
+
 # --- Очередь логов ---
 log_queue = asyncio.Queue()
 
@@ -183,6 +186,20 @@ async def broadcast_frame(frame_bytes: bytes):
         except:
             pass
 
+async def broadcast_frame_ws(frame_bytes: bytes):
+    """Broadcast raw frame via WebSocket (low latency)"""
+    import base64
+    frame_b64 = base64.b64encode(frame_bytes).decode('utf-8')
+    for ws in frame_clients:
+        try:
+            await ws.send_text(json.dumps({
+                "type": "frame",
+                "data": frame_b64,
+                "timestamp": int(time.time() * 1000)
+            }))
+        except:
+            pass
+
 async def add_esp32_log(message: str, level: str = "INFO", device_id: str = "ESP32-1"):
     """Add a log from ESP32 device"""
     global esp32_logs
@@ -255,6 +272,34 @@ async def websocket_logs(websocket: WebSocket):
             log_clients.remove(websocket)
         if client_id in last_ping_time:
             del last_ping_time[client_id]
+
+@app.websocket("/ws/frames")
+async def websocket_frames(websocket: WebSocket):
+    """
+    WebSocket endpoint for raw frame streaming (low latency)
+    Sends base64 encoded JPEG frames as soon as they arrive
+    """
+    await websocket.accept()
+    frame_clients.append(websocket)
+    logger.info(f"Frame client connected: {len(frame_clients)} clients")
+
+    try:
+        while True:
+            # Keep connection alive by waiting for messages
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text(json.dumps({
+                    "type": "pong",
+                    "timestamp": int(time.time() * 1000)
+                }))
+    except WebSocketDisconnect:
+        logger.info("Frame client disconnected")
+    except Exception as e:
+        logger.error(f"Frame WebSocket error: {e}")
+    finally:
+        if websocket in frame_clients:
+            frame_clients.remove(websocket)
+        logger.info(f"Frame clients remaining: {len(frame_clients)}")
 
 @app.get("/api/stream")
 async def stream():
@@ -390,6 +435,8 @@ async def upload_frame(request: Request):
             frame.save(output, format="JPEG", quality=85)
             jpeg_bytes = output.getvalue()
             await broadcast_frame(jpeg_bytes)
+            # Также отправляем через WebSocket (низкая задержка)
+            await broadcast_frame_ws(jpeg_bytes)
         except Exception as e:
             logger.error(f"Broadcast error: {e}")
 
@@ -789,10 +836,8 @@ async def esp32_status():
 async def esp32_log():
     """
     Simple log endpoint for ESP32
-    Returns latest detection/alert as simple JSON string
-
-    Response: {"log":"AI: person detected (87%)"}
-
+    Returns latest detection/alert as short JSON
+    Response: {"log":"PERSON 87%"}
     ESP32 should ping this every 2 seconds
     """
     try:
@@ -804,7 +849,7 @@ async def esp32_log():
                 high_conf = [d for d in detection["detections"] if d["score"] > 0.65]
                 if high_conf:
                     d = high_conf[0]
-                    log_message = f"AI: {d['class'].upper()} detected ({int(d['score'] * 100)}%)"
+                    log_message = f"{d['class'].upper()} {int(d['score'] * 100)}%"
                     break
 
         # If no client detection, check for latest server disaster
@@ -813,23 +858,17 @@ async def esp32_log():
             if latest.get("disasters_found", 0) > 0:
                 disaster_type = latest.get("disaster_type", "UNKNOWN")
                 confidence = latest.get("max_confidence", 0)
-                log_message = f"DISASTER: {disaster_type.upper()} ({int(confidence * 100)}%)"
+                log_message = f"{disaster_type.upper()} {int(confidence * 100)}%"
 
-        # If still no detection, return OK status
+        # If still no detection, return monitoring status
         if not log_message:
-            log_message = "AI: Monitoring... No alerts"
+            log_message = "MONITORING..."
 
-        return {
-            "log": log_message,
-            "timestamp": int(time.time() * 1000)
-        }
+        return {"log": log_message}
 
     except Exception as e:
         logger.error(f"ESP32 log error: {str(e)}")
-        return {
-            "log": f"ERROR: {str(e)}",
-            "timestamp": int(time.time() * 1000)
-        }
+        return {"log": "ERROR"}
 
 
 @app.get("/{full_path:path}", include_in_schema=False)

@@ -1,170 +1,71 @@
-# 🤖 AI Smart Grabber / AI-Controlled Manipulator
+# 🛰️ SENTINEL.SAT
 
-**Интеллектуальная система манипуляции с компьютерным зрением**
+**«Ранняя детекция чрезвычайных ситуаций в реальном времени»**
 
-AI Smart Grabber — это интеллектуальная система управления манипулятором, которая использует YOLO для детекции объектов и ESP32 для управления сервоприводами. Система способна различать разрешенные и запрещенные предметы и соответствующим образом реагировать на них.
+SENTINEL.SAT — система мониторинга пожаров и ЧС с использованием ESP32-CAM и AI.
 
-## 🎯 Основные возможности
+## 🎯 Возможности
 
-- **Детекция объектов в реальном времени** с помощью YOLOv8
-- **Управление манипулятором** через ESP32-Servo
-- **Видеопоток** с ESP32-CAM для анализа
-- **Классификация предметов** на разрешенные/запрещенные
-- **API для интеграции** с внешними системами
+- **Детекция**: пожары, дым, опасные зоны
+- **Реальное время**: WebSocket обновления
+- **Источники**: локальные камеры + спутниковая аналитика
 
-## 🏗 Архитектура системы
+## 🏗 Архитектура
 
 ```
-📷 ESP32-CAM → захват видео
-🤖 AI Server → детекция объектов YOLO
-🦾 ESP32-Servo → управление манипулятором
-🌐 Web Interface → мониторинг и управление
+📷 ESP32-CAM → FastAPI Backend → HuggingFace AI → React Frontend
 ```
 
 ## 🚀 Быстрый старт
 
-### 1. Настройка AI Server
-
+### 1. Запуск бэкенда
 ```bash
-cd ai_server
-pip install -r requirements.txt
-python main.py
+cd backend && pip install -r requirements.txt
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-### 2. Настройка ESP32-CAM
-
-- Загрузите скетч в папке `esp32-cam/`
-- Настройте WiFi подключение
-- Запустите видеопоток
-
-### 3. Настройка ESP32-Servo
-
-- Загрузите скетч в папке `esp32-servo/`
-- Подключите сервоприводы
-- Настройте управление
-
-### 4. Доступ к системе
-
-- **API**: `http://localhost:8000`
-- **Документация**: `http://localhost:8000/docs`
-- **Видеопоток**: `http://esp32-cam-ip/stream`
-
-## 🔧 Технологический стек
-
-### Backend
-- **FastAPI** - высокопроизводительный веб-фреймворк
-- **YOLOv8** - детекция объектов
-- **OpenCV** - обработка изображений
-- **Python 3.11+** - основной язык разработки
-
-### Hardware
-- **ESP32-CAM** - захват видео
-- **ESP32-Servo** - управление манипулятором
-- **Сервоприводы** - механика манипулятора
-
-### Software
-- **Arduino IDE** - прошивка ESP32
-- **Python** - AI сервер
-- **FastAPI** - API сервер
-
-## � Структура проекта
-
-```
-├── ai_server/           # AI сервер с YOLO
-│   ├── main.py          # основной FastAPI сервер
-│   ├── yolo_detector.py # детектор объектов
-│   ├── models.py        # модели данных
-│   └── requirements.txt # зависимости Python
-├── esp32-cam/           # прошивка для ESP32-CAM
-│   └── esp32_cam.ino    # скетч для камеры
-├── esp32-servo/         # прошивка для ESP32-Servo
-│   └── esp32_servo.ino  # скетч для сервоприводов
-└── README.md            # документация
-```
-
-## 🔌 API Эндпоинты
-
-### Основные эндпоинты
-
-- `GET /status` - статус сервера
-- `POST /analyze` - анализ загруженного изображения
-- `POST /analyze/esp32` - анализ с ESP32-CAM
-- `GET /allowed-classes` - список разрешенных классов
-- `POST /allowed-classes` - обновление разрешенных классов
-
-### WebSocket
-
-- `ws://localhost:8000/ws` - реальное время детекции
-
-## ⚙️ Конфигурация
-
-Создайте `.env` файл:
-
-```env
-ESP32_CAM_URL=http://your-esp32-cam-ip
-YOLO_MODEL_PATH=yolov8n.pt
-CONFIDENCE_THRESHOLD=0.5
-```
-
-## 🎯 Алгоритм работы
-
-1. **Захват видео** с ESP32-CAM
-2. **Детекция объектов** с помощью YOLO
-3. **Классификация** на разрешенные/запрещенные
-4. **Отправка команд** на ESP32-Servo
-5. **Манипуляция** объектами в зависимости от класса
-
-## �️ Установка и настройка
-
-### Требования
-
-- Python 3.11+
-- Arduino IDE 2.0+
-- ESP32-CAM
-- ESP32
-- Сервоприводы (SG90 или аналогичные)
-
-### Установка зависимостей
-
+### 2. Запуск фронтенда
 ```bash
-pip install fastapi uvicorn python-multipart opencv-python ultralytics numpy pillow requests aiofiles pydantic
+cd frontend && npm install && npm run dev
 ```
 
-### Прошивка ESP32
+### 3. Прошивка ESP32-CAM
+- Настройте Wi-Fi в `esp32_example/esp32cam.ino`
+- Прошейте устройство
 
-1. Установите Arduino IDE
-2. Добавите поддержку ESP32
-3. Выберите правильную плату
-4. Загрузите соответствующий скетч
+## 📁 Структура
 
-## 📊 Возможные классы объектов
+```
+├── backend/          # FastAPI сервер
+├── frontend/         # React приложение  
+├── hf_space/         # HuggingFace AI
+├── esp32_example/    # Прошивки ESP32
+└── Dockerfile        # Мульти-стейдж билд
+```
 
-Система может детектировать различные объекты:
+## 📊 API
 
-- **Разрешенные**: cup, book, phone, pen
-- **Запрещенные**: knife, scissors, weapon
-- **Нейтральные**: box, bottle, bag
+- `POST /api/upload-frame` - кадры с ESP32
+- `POST /api/upload` - ручная загрузка
+- `GET /api/latest` - последние детекции
+- `WS /ws/logs` - реальное время
 
-## 🔄 Интеграция
+## 🌐 Ссылки
 
-Система легко интегрируется с другими проектами:
-
-- Промышленная автоматизация
-- Сортировка объектов
-- Системы безопасности
-- Образовательные проекты
-
-## 🤝 Вклад в проект
-
-1. Fork репозитория
-2. Создайте feature branch
-3. Внесите изменения
-4. Отправьте Pull Request
-
-## 📄 Лицензия
-
-MIT License - свободное использование
+- **GitHub**: [github.com/Dyman17/sentinel-watch](https://github.com/Dyman17/sentinel-watch)
+- **Live Demo**: [sentinel-sat.onrender.com](https://sentinel-sat.onrender.com)
+- **AI Space**: [huggingface.co/spaces/Dyman17/sentinel-watch](https://huggingface.co/spaces/Dyman17/sentinel-watch)
+- **Презентация**: [Google Slides](https://docs.google.com/presentation/d/1FCL2t7_7N6AEPTfaFdzLETOuuKQb_Nk-/edit?usp=sharing&ouid=116860278482411569103&rtpof=true&sd=true)
+- **Видео**: [Google Drive](https://drive.google.com/file/d/1wsEiyUkcTQV7qe8eySsrQcF3eUTUwkTe/view?usp=sharing)
+- **Документация**: [Google Docs](https://drive.google.com/file/d/12-Y89PafHf988pY-XUgSG19HoaUnw4R5/view?usp=sharing)
 
 ---
 
-**🤖 AI Smart Grabber - Умная манипуляция для вашего проекта!**
+<div align="center">
+
+**🛰️ SENTINEL.SAT - Защитим будущее вместе!**
+
+[![Website](https://img.shields.io/badge/🌐-Website-success?style=flat-square)](https://sentinel-sat.onrender.com)
+[![GitHub](https://img.shields.io/badge/📦-GitHub-black?style=flat-square)](https://github.com/Dyman17/sentinel-watch)
+
+</div>

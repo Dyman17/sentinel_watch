@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL.SAT - Pitch Deck</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f1e;
+            color: #ffffff;
+        }
+
+        @media print {
+            .slide { page-break-after: always; }
+        }
+
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 40px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+        }
+
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(255, 107, 53, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .slide-content {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 1000px;
+            overflow: hidden;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 40px;
+            right: 60px;
+            font-size: 16px;
+            color: #666;
+            z-index: 2;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 84px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ff6b35 0%, #00d4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 56px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+        }
+
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            margin: 16px 0 12px 0;
+            color: #00d4ff;
+            letter-spacing: -0.01em;
+        }
+
+        p {
+            font-size: 18px;
+            line-height: 1.6;
+            margin: 8px 0;
+            color: #d0d0d0;
+            font-weight: 400;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            color: #a0a0a0;
+            margin-bottom: 60px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+        }
+
+        .team {
+            font-size: 20px;
+            line-height: 2.2;
+            margin-top: 60px;
+            color: #c0c0c0;
+        }
+
+        .team-member {
+            margin: 12px 0;
+            padding-left: 0;
+            font-weight: 400;
+        }
+
+        .feature-list {
+            margin: 30px 0;
+            font-size: 18px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 16px 0;
+            padding: 16px;
+            background: rgba(0, 212, 255, 0.08);
+            border-left: 3px solid #00d4ff;
+            border-radius: 0;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-right: 20px;
+            min-width: 30px;
+            flex-shrink: 0;
+            color: #00d4ff;
+        }
+
+        .feature-item strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .problem-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin: 40px 0;
+        }
+
+        .comparison-box {
+            padding: 40px;
+            border-radius: 0;
+            border: 2px solid #ff6b35;
+            background: rgba(255, 107, 53, 0.05);
+        }
+
+        .comparison-box.solution {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .comparison-box h3 {
+            margin-top: 0;
+            font-size: 24px;
+        }
+
+        .comparison-box p {
+            font-size: 18px;
+            margin: 14px 0;
+            color: #c0c0c0;
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin: 40px 0;
+        }
+
+        .tech-item {
+            padding: 28px;
+            background: rgba(255, 107, 53, 0.08);
+            border: 1px solid #ff6b35;
+            border-radius: 0;
+        }
+
+        .tech-item strong {
+            color: #ff6b35;
+            font-size: 18px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .tech-item p {
+            font-size: 16px;
+            margin: 8px 0;
+            color: #b0b0b0;
+        }
+
+        table {
+            width: 100%;
+            margin: 30px 0;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: rgba(0, 212, 255, 0.15);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #00d4ff;
+            color: #00d4ff;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+            color: #c0c0c0;
+        }
+
+        tr:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .metric {
+            display: inline-block;
+            margin: 16px 24px 16px 0;
+            padding: 28px;
+            background: rgba(0, 212, 255, 0.1);
+            border: 2px solid #00d4ff;
+            border-radius: 0;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 40px;
+            font-weight: 700;
+            color: #00ff88;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: #999;
+            margin-top: 8px;
+            font-weight: 500;
+        }
+
+        .roadmap {
+            margin: 40px 0;
+        }
+
+        .roadmap-phase {
+            margin: 28px 0;
+            padding: 28px;
+            background: rgba(255, 107, 53, 0.08);
+            border-left: 4px solid #ff6b35;
+            border-radius: 0;
+        }
+
+        .roadmap-phase h3 {
+            color: #ff6b35;
+            margin-top: 0;
+            font-size: 22px;
+        }
+
+        .roadmap-phase p {
+            font-size: 18px;
+            margin: 8px 0;
+            color: #b0b0b0;
+        }
+
+        .contact-info {
+            font-size: 20px;
+            margin-top: 40px;
+            line-height: 2;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+        }
+
+        .contact-item strong {
+            color: #00d4ff;
+            min-width: 180px;
+            font-weight: 600;
+        }
+
+        .contact-item a {
+            color: #ff6b35;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .contact-item a:hover {
+            text-decoration: underline;
+        }
+
+        .ending-text {
+            font-size: 48px;
+            font-weight: 700;
+            text-align: center;
+            background: linear-gradient(135deg, #ff6b35 0%, #00d4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            font-size: 20px;
+        }
+
+        .step-number {
+            background: #00d4ff;
+            color: #0f0f1e;
+            width: 48px;
+            height: 48px;
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 20px;
+            flex-shrink: 0;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+        }
+
+        .arrow {
+            color: #00d4ff;
+            margin: 0 16px;
+            font-size: 28px;
+        }
+
+        .icon-box {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            background: rgba(0, 212, 255, 0.15);
+            border: 1px solid #00d4ff;
+            margin-right: 16px;
+            flex-shrink: 0;
+        }
+
+        .icon-box svg {
+            width: 28px;
+            height: 28px;
+            stroke: #00d4ff;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        @media print {
+            body { margin: 0; padding: 0; }
+            .slide { width: 100%; height: auto; min-height: 100vh; page-break-after: always; padding: 40px; }
+            h1 { font-size: 42px; }
+            h2 { font-size: 36px; }
+            p { font-size: 14px; }
+            table { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- СЛАЙД 1: ТИТУЛ -->
+    <div class="slide">
+        <div class="slide-content" style="text-align: center;">
+            <!-- SENTINEL.SAT Logo - Satellite Globe -->
+            <div style="display: inline-block; margin-bottom: 40px;">
+                <svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="margin: 0 auto 30px auto; display: block;">
+                    <defs>
+                        <linearGradient id="globeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#ff6b35;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Outer circle background -->
+                    <circle cx="70" cy="70" r="68" fill="none" stroke="#ff6b35" stroke-width="2" opacity="0.3"/>
+
+                    <!-- Globe base -->
+                    <circle cx="70" cy="70" r="50" fill="#1a1a2e" stroke="#00d4ff" stroke-width="2.5"/>
+
+                    <!-- Latitude lines -->
+                    <circle cx="70" cy="70" r="50" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.4"/>
+                    <ellipse cx="70" cy="70" rx="50" ry="35" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
+                    <ellipse cx="70" cy="70" rx="50" ry="20" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.2"/>
+
+                    <!-- Longitude lines -->
+                    <line x1="70" y1="20" x2="70" y2="120" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
+                    <line x1="40" y1="30" x2="100" y2="110" stroke="#00d4ff" stroke-width="1" opacity="0.2"/>
+                    <line x1="100" y1="30" x2="40" y2="110" stroke="#00d4ff" stroke-width="1" opacity="0.2"/>
+
+                    <!-- Orange accent point (location marker) -->
+                    <circle cx="85" cy="55" r="5" fill="#ff6b35"/>
+                    <circle cx="85" cy="55" r="8" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.6"/>
+
+                    <!-- Satellite antenna/signal points -->
+                    <g opacity="0.8">
+                        <!-- Top antenna -->
+                        <line x1="70" y1="15" x2="70" y2="5" stroke="#ff6b35" stroke-width="2.5" stroke-linecap="round"/>
+                        <circle cx="70" cy="3" r="2.5" fill="#ff6b35"/>
+
+                        <!-- Side antennas -->
+                        <line x1="125" y1="70" x2="135" y2="70" stroke="#ff6b35" stroke-width="2.5" stroke-linecap="round"/>
+                        <circle cx="137" cy="70" r="2.5" fill="#ff6b35"/>
+                    </g>
+
+                    <!-- S letter in center (subtle) -->
+                    <text x="70" y="80" font-family="'Space Grotesk', sans-serif" font-size="42" font-weight="700" fill="#00d4ff" text-anchor="middle" opacity="0.6">S</text>
+                </svg>
+            </div>
+
+            <!-- Основной заголовок белый -->
+            <div style="margin-bottom: 20px;">
+                <h1 style="background: none; -webkit-text-fill-color: unset; color: #ffffff; font-size: 96px; margin: 0;">SENTINEL</h1>
+                <div style="font-size: 96px; font-weight: 700; color: #ffffff; font-family: 'Space Grotesk', sans-serif; margin: 0;">
+                    SAT<span style="color: #ff6b35;">.</span>
+                </div>
+            </div>
+
+            <p class="subtitle" style="color: #ffffff; font-size: 28px; margin: 40px 0 0 0; font-weight: 400;">
+                Distributed AI Disaster Early Detection System
+            </p>
+
+            <!-- Команда -->
+            <div class="team" style="margin: 120px 0; text-align: left; display: inline-block;">
+                <div style="font-size: 18px; color: #ffffff; margin-bottom: 20px; font-weight: 600; font-family: 'Space Grotesk', sans-serif;">КОМАНДА</div>
+                <div class="team-member" style="color: #ffffff; font-size: 18px;">Қалнияз Айсара Чамқызы</div>
+                <div class="team-member" style="color: #ffffff; font-size: 18px;">Асқар Мансур Серикұлы</div>
+                <div class="team-member" style="color: #ffffff; font-size: 18px;">Қуандық Айнұр Тимурқызы</div>
+                <div class="team-member" style="color: #ffffff; font-size: 18px;">Серікболұлы Эльдар</div>
+            </div>
+
+            <p style="margin-top: 100px; font-size: 16px; color: #999; letter-spacing: 0.05em;">
+                HACKATHON 2026 | 26 ФЕВРАЛЯ
+            </p>
+        </div>
+        <div class="slide-number">1</div>
+    </div>
+
+    <!-- СЛАЙД 2: ПРОБЛЕМА -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Проблема</h2>
+            <p style="margin-bottom: 40px; color: #b0b0b0;">Современные системы мониторинга чрезвычайных ситуаций:</p>
+
+            <div class="problem-comparison">
+                <div class="comparison-box">
+                    <h3 style="color: #ff6b35;">Традиционные методы</h3>
+                    <p>Задержка: 30 минут — несколько часов</p>
+                    <p>Зависимость от облачности</p>
+                    <p>Редкие пролеты спутников</p>
+                    <p>Бюрократические процессы</p>
+                    <p>Огромные потери имущества</p>
+                </div>
+
+                <div class="comparison-box solution">
+                    <h3 style="color: #00ff88;">SENTINEL.SAT</h3>
+                    <p>Задержка: менее 2 секунд</p>
+                    <p>Независимость от погоды</p>
+                    <p>Непрерывное покрытие</p>
+                    <p>Полная автоматизация</p>
+                    <p>Спасение жизней</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">2</div>
+    </div>
+
+    <!-- СЛАЙД 3: РЕШЕНИЕ -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Решение</h2>
+            <p style="margin-bottom: 40px; color: #b0b0b0;">Распределенная IoT-система раннего обнаружения ЧС в реальном времени</p>
+
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="feature-icon">▪</div>
+                    <div><strong>Наземная сеть</strong> ESP32-CAM с встроенным AI</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">▪</div>
+                    <div><strong>Спутниковая интеграция</strong> Sentinel-2, NASA GIBS</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">▪</div>
+                    <div><strong>Real-time обработка</strong> менее 2 секунд</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">▪</div>
+                    <div><strong>Мониторинг "последней мили"</strong> критических зон</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">▪</div>
+                    <div><strong>Масштабируемая архитектура</strong> микросервисной</div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">3</div>
+    </div>
+
+    <!-- СЛАЙД 4: MVP / ТЕХНИКА -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Технический стек</h2>
+
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <strong>Hardware</strong>
+                    <p>ESP32-CAM (OV2640, 640x480)</p>
+                    <p>Батарея 18650 или питание</p>
+                    <p>Wi-Fi 802.11 b/g/n</p>
+                    <p>Панели расширения (опционально)</p>
+                </div>
+
+                <div class="tech-item">
+                    <strong>Backend</strong>
+                    <p>FastAPI (Python 3.11)</p>
+                    <p>PostgreSQL + Redis</p>
+                    <p>WebSocket для real-time</p>
+                    <p>Docker & Kubernetes</p>
+                </div>
+
+                <div class="tech-item">
+                    <strong>AI Model</strong>
+                    <p>DETR (ResNet-50)</p>
+                    <p>HuggingFace Spaces</p>
+                    <p>COCO dataset (80 классов)</p>
+                    <p>mAP 0.72, планы 0.85+</p>
+                </div>
+
+                <div class="tech-item">
+                    <strong>Frontend</strong>
+                    <p>React + TypeScript</p>
+                    <p>Leaflet + NASA GIBS</p>
+                    <p>WebSocket + MJPEG</p>
+                    <p>TensorFlow.js интеграция</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">4</div>
+    </div>
+
+    <!-- СЛАЙД 5: КЛЮЧЕВЫЕ ОТЛИЧИЯ -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Ключевые преимущества</h2>
+
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Скорость:</strong> 2 сек vs 10-60 минут (30x быстрее)</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Стоимость узла:</strong> ~$10 vs $1M+ за спутник</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Точность:</strong> mAP 0.72 на COCO, планы 0.85+</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Масштабируемость:</strong> микросервисная архитектура</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Real-time стриминг:</strong> 4-5 FPS, WebSocket</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Автономность:</strong> батарея/солнечные панели</div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">5</div>
+    </div>
+
+    <!-- СЛАЙД 6: PIPELINE ОБРАБОТКИ -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Pipeline обработки</h2>
+
+            <div style="margin: 60px 0;">
+                <div class="pipeline-step">
+                    <div class="step-number">1</div>
+                    <div>Захват изображения ESP32-CAM (2 FPS, 640x480)</div>
+                </div>
+
+                <div style="text-align: center; color: #00d4ff; font-size: 24px; margin: 16px 0;">↓</div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">2</div>
+                    <div>Сжатие JPEG (quality 85, ~20KB)</div>
+                </div>
+
+                <div style="text-align: center; color: #00d4ff; font-size: 24px; margin: 16px 0;">↓</div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">3</div>
+                    <div>Передача HTTP POST + WebSocket (~50ms)</div>
+                </div>
+
+                <div style="text-align: center; color: #00d4ff; font-size: 24px; margin: 16px 0;">↓</div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">4</div>
+                    <div>DETR инференс на HuggingFace (~8 сек, async)</div>
+                </div>
+
+                <div style="text-align: center; color: #00d4ff; font-size: 24px; margin: 16px 0;">↓</div>
+
+                <div class="pipeline-step">
+                    <div class="step-number">5</div>
+                    <div>Классификация объектов и обновление UI</div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">6</div>
+    </div>
+
+    <!-- СЛАЙД 7: AI МОДЕЛЬ -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>AI Модель: DETR</h2>
+
+            <div class="feature-list" style="margin-top: 40px;">
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>DEtection TRansformer</strong> — современный подход на базе Transformer</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Backbone:</strong> ResNet-50 для извлечения признаков</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Encoder/Decoder:</strong> Transformer для анализа зависимостей</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>COCO dataset:</strong> 80 классов объектов</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Пороги обнаружения:</strong> confidence > 0.65 для алертов</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 60px; color: #00ff88;">Планы улучшения:</h3>
+            <p style="font-size: 20px; margin-top: 16px; color: #b0b0b0;">
+                Дообучение на Fire Detection Dataset и FloodNet<br>
+                Целевой mAP: 0.85–0.9 (текущий 0.72)
+            </p>
+        </div>
+        <div class="slide-number">7</div>
+    </div>
+
+    <!-- СЛАЙД 8: ПРОИЗВОДИТЕЛЬНОСТЬ -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Производительность</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin: 60px 0;">
+                <div>
+                    <div class="metric" style="width: 100%; text-align: center;">
+                        <div class="metric-value">1.8 сек</div>
+                        <div class="metric-label">Total Latency</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="metric" style="width: 100%; text-align: center;">
+                        <div class="metric-value">4-5 FPS</div>
+                        <div class="metric-label">Video Stream</div>
+                    </div>
+                </div>
+            </div>
+
+            <table>
+                <tr>
+                    <th>Метрика</th>
+                    <th>Значение</th>
+                </tr>
+                <tr>
+                    <td>Latency (frame to display)</td>
+                    <td>10-50 ms (WebSocket)</td>
+                </tr>
+                <tr>
+                    <td>Detection Accuracy (mAP)</td>
+                    <td>0.72 на COCO</td>
+                </tr>
+                <tr>
+                    <td>False Positive Rate</td>
+                    <td>8%</td>
+                </tr>
+                <tr>
+                    <td>Uptime (reliability)</td>
+                    <td>99%</td>
+                </tr>
+                <tr>
+                    <td>Power consumption</td>
+                    <td>~180 mA (18650)</td>
+                </tr>
+            </table>
+        </div>
+        <div class="slide-number">8</div>
+    </div>
+
+    <!-- СЛАЙД 9: HARDWARE -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Hardware спецификация</h2>
+
+            <div class="feature-list" style="margin-top: 40px;">
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Микроконтроллер:</strong> ESP32 (Xtensa LX6 dual-core, 240MHz)</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Камера:</strong> OV2640 CMOS (VGA 640x480, JPEG/RGB565)</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Коммуникация:</strong> Wi-Fi 802.11 b/g/n, Bluetooth 4.2</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Память:</strong> 520 KB SRAM, 4MB Flash (PSRAM опционально)</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Питание:</strong> 3.3V, ~180mA; батарея 18650</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">◆</div>
+                    <div><strong>Расширения:</strong> солнечные панели, IoT датчики</div>
+                </div>
+            </div>
+
+            <p style="text-align: center; margin-top: 60px; font-size: 18px; color: #00d4ff;">
+                Идеальное соотношение цены, производительности и энергоэффективности
+            </p>
+        </div>
+        <div class="slide-number">9</div>
+    </div>
+
+    <!-- СЛАЙД 10: SOFTWARE АРХИТЕКТУРА -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Software архитектура</h2>
+
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <strong>Backend</strong>
+                    <p>FastAPI (Python 3.11)</p>
+                    <p>PostgreSQL для логов</p>
+                    <p>Redis для кеширования</p>
+                    <p>WebSocket real-time</p>
+                    <p>Docker + K8s ready</p>
+                </div>
+
+                <div class="tech-item">
+                    <strong>Frontend</strong>
+                    <p>React + TypeScript</p>
+                    <p>Leaflet для карт</p>
+                    <p>MJPEG + WebSocket</p>
+                    <p>TensorFlow.js YOLO</p>
+                    <p>Responsive UI</p>
+                </div>
+
+                <div class="tech-item">
+                    <strong>AI Pipeline</strong>
+                    <p>DETR на HuggingFace</p>
+                    <p>Gradio для демо</p>
+                    <p>Async обработка</p>
+                    <p>Model versioning</p>
+                    <p>A/B testing</p>
+                </div>
+
+                <div class="tech-item">
+                    <strong>DevOps</strong>
+                    <p>GitHub Actions CI/CD</p>
+                    <p>Render deployment</p>
+                    <p>HuggingFace Spaces</p>
+                    <p>Logging + Monitoring</p>
+                    <p>99% SLA</p>
+                </div>
+            </div>
+
+            <p style="text-align: center; margin-top: 40px; font-size: 18px; color: #00ff88;">
+                Полная интеграция в Single Page Application
+            </p>
+        </div>
+        <div class="slide-number">10</div>
+    </div>
+
+    <!-- СЛАЙД 11: ПЛАН МАСШТАБИРОВАНИЯ -->
+    <div class="slide">
+        <div class="slide-content">
+            <h2>Дорожная карта развития</h2>
+
+            <div class="roadmap">
+                <div class="roadmap-phase">
+                    <h3>Q1-Q2 2026 (Краткосрочно)</h3>
+                    <p>Дообучение модели на специализированных датасетах</p>
+                    <p>Сбор Fire Detection Dataset и FloodNet</p>
+                    <p>Повышение mAP с 0.72 до 0.80+</p>
+                    <p>Интеграция с системами МЧС (API для алертов)</p>
+                </div>
+
+                <div class="roadmap-phase">
+                    <h3>Q3-Q4 2026 (Среднесрочно)</h3>
+                    <p>Multi-camera сети (10-50 камер на зону)</p>
+                    <p>3D реконструкция (Structure from Motion)</p>
+                    <p>Интеграция со спутниковыми данными (Sentinel-2)</p>
+                    <p>Мобильное приложение (iOS/Android)</p>
+                </div>
+
+                <div class="roadmap-phase">
+                    <h3>2027+ (Долгосрочно)</h3>
+                    <p>Автономные станции (100+ узлов)</p>
+                    <p>Солнечные панели + батареи (24/7 uptime)</p>
+                    <p>Edge ML (TensorFlow Lite на ESP32)</p>
+                    <p>Сеть 1000+ датчиков по РК и странам региона</p>
+                </div>
+            </div>
+
+            <p style="text-align: center; margin-top: 40px; font-size: 18px; color: #00d4ff;">
+                Стратегическая цель: лидер в диагностике ЧС Центральной Азии
+            </p>
+        </div>
+        <div class="slide-number">11</div>
+    </div>
+
+    <!-- СЛАЙД 12: КОНТАКТЫ И ФИНАЛ -->
+    <div class="slide">
+        <div class="slide-content" style="text-align: center;">
+            <h2 style="margin-bottom: 80px;">Контакты и ресурсы</h2>
+
+            <div class="contact-info" style="text-align: left; display: inline-block;">
+                <div class="contact-item">
+                    <strong>GitHub:</strong>
+                    <a href="https://github.com/Dyman17/sentinel_watch">
+                        github.com/Dyman17/sentinel_watch
+                    </a>
+                </div>
+                <div class="contact-item">
+                    <strong>Live Demo:</strong>
+                    <a href="https://sentinel-sat.onrender.com">
+                        sentinel-sat.onrender.com
+                    </a>
+                </div>
+                <div class="contact-item">
+                    <strong>AI Model:</strong>
+                    <a href="https://huggingface.co">
+                        HuggingFace Spaces
+                    </a>
+                </div>
+            </div>
+
+            <div class="ending-text" style="margin-top: 140px; line-height: 1.4;">
+                SENTINEL.SAT<br>
+                <span style="font-size: 36px; display: block; margin-top: 20px;">Видеть раньше, чтобы спасти</span><br>
+                <span style="font-size: 28px; color: #ff6b35;">Спасаем жизни через AI</span>
+            </div>
+        </div>
+        <div class="slide-number">12</div>
+    </div>
+
+    <script>
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+            } else if (e.key === 'ArrowLeft') {
+                window.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+            }
+        });
+
+        console.log('Для экспорта в PDF: Ctrl+P (Windows) или Cmd+P (Mac)');
+    </script>
+</body>
+</html>
