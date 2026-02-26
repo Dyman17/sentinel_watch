@@ -686,8 +686,10 @@ async def health_check():
 
 @app.get("/{full_path:path}", include_in_schema=False)
 def serve_spa(full_path: str):
-    # Не перехватываем API пути
+    # Только блокируем явно неправильные API пути
+    # Специфичные API маршруты обработаны выше и не дойдут сюда
     if full_path.startswith("api/") or full_path.startswith("ws/"):
+        # Это значит, что конкретный endpoint не найден
         return JSONResponse({"error": "Not found"}, status_code=404)
 
     # Пытаемся найти файл в static директории
