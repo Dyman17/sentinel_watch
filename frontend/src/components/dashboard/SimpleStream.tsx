@@ -123,7 +123,11 @@ export const SimpleStream = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Таймер задержки (для интерактива)
+  const [latencyMs, setLatencyMs] = useState(2000);
+  const [frameTimestamp, setFrameTimestamp] = useState<number | null>(null);
+
   // API base URL from environment
   const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -197,16 +201,28 @@ export const SimpleStream = () => {
     }
   };
 
+  // Таймер задержки (обновляется каждые 100мс)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (frameTimestamp) {
+        const elapsed = Date.now() - frameTimestamp;
+        setLatencyMs(Math.max(0, 2000 - elapsed)); // 2 сек макс задержка
+      }
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [frameTimestamp]);
+
   // Auto-refresh data
   useEffect(() => {
     fetchLatest();
     fetchLogs();
-    
+
     const interval = setInterval(() => {
       fetchLatest();
       fetchLogs();
     }, 5000); // Refresh every 5 seconds
-    
+
     return () => clearInterval(interval);
   }, [currentSource]);
 
@@ -334,19 +350,39 @@ export const SimpleStream = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Camera className="w-5 h-5" />
-              Видеопоток
+              Видеопоток {frameTimestamp && <span className="text-xs text-green-500 ml-2">● LIVE</span>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+              {/* Латентность таймер */}
+              {frameTimestamp && (
+                <div className="absolute top-2 right-2 z-10 bg-black/60 text-white px-3 py-2 rounded-lg font-mono text-sm">
+                  ⏱️ {(latencyMs / 1000).toFixed(2)}s
+                </div>
+              )}
+
+              {/* Индикатор обработки */}
+              {isLoading && (
+                <div className="absolute top-2 left-2 z-10 flex items-center gap-2 bg-black/60 text-white px-3 py-2 rounded-lg text-sm">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  Обработка...
+                </div>
+              )}
+
               <img
                 src={streamUrl}
                 alt="Video Stream"
                 className="w-full h-full object-cover"
+                onLoad={() => {
+                  setFrameTimestamp(Date.now());
+                  setIsLoading(false);
+                }}
                 onError={(e) => {
                   e.currentTarget.src = '';
+                  setIsLoading(false);
                 }}
-                style={{ 
+                style={{
                   background: 'linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%)',
                   backgroundSize: '20px 20px',
                   backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
