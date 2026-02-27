@@ -15,6 +15,11 @@ import logging
 import json
 import time
 from datetime import datetime, timedelta
+import cv2
+
+# --- AI Models URLs ---
+HF_API_URL = os.getenv("HF_API_URL", "https://Dyman17-sentinel-watch.hf.space/predict")
+WILDFIRE_API_URL = os.getenv("WILDFIRE_API_URL", "https://Dyman17-test.hf.space")
 
 # --- Часовой пояс +5 часов ---
 TIMEZONE_OFFSET = 5  # UTC+5 для Казахстана
@@ -324,6 +329,122 @@ async def stream():
                 clients.remove(q)
     return StreamingResponse(generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
+async def analyze_with_wildfire_model(frame_image, current_time):
+    """Анализ с помощью wildfire-flood-detector модели"""
+    try:
+        # Сохраняем во временный файл для отправки
+        temp_output = io.BytesIO()
+        frame_image.save(temp_output, format="JPEG", quality=85)
+        frame_bytes = temp_output.getvalue()
+        
+        # Отправляем в wildfire-flood-detector
+        form_data = {
+            'file': ('image.jpg', frame_bytes, 'image/jpeg'),
+            'conf': '0.4'  # confidence threshold
+        }
+        
+        resp = await http_client.post(
+            f"{WILDFIRE_API_URL}/api/predict",
+            files=form_data,
+            timeout=30.0
+        )
+        
+        if resp.status_code == 200:
+            result = resp.json()
+            logger.info(f"✅ Wildfire analysis OK: {result}")
+            
+            # Парсим результаты wildfire модели
+            wildfire_detections = []
+            
+            # Если результат содержит детекции
+            if 'predictions' in result:
+                for pred in result['predictions']:
+                    label = pred.get('label', '').lower()
+                    score = pred.get('confidence', pred.get('score', 0))
+                    
+                    # Классифицируем как катастрофу
+                    if any(kw in label for kw in ['fire', 'smoke', 'flood', 'wildfire']):
+                        disaster_type = 'fire' if 'fire' in label or 'smoke' in label else 'flood'
+                        wildfire_detections.append({
+                            'label': disaster_type,
+                            'score': score,
+                            'original_label': label,
+                            'box': pred.get('box', {}),
+                            'timestamp': current_time,
+                            'source': 'wildfire_model'
+                        })
+            
+            return {
+                'predictions': result.get('predictions', []),
+                'disaster_detections': wildfire_detections,
+                'total_objects': len(result.get('predictions', [])),
+                'disasters_found': len(wildfire_detections),
+                'timestamp': current_time,
+                'source': 'wildfire_detector'
+            }
+            
+        else:
+            logger.warning(f"⚠️ Wildfire API error: {resp.status_code}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"❌ Wildfire analysis error: {e}")
+        return None
+
+async def analyze_with_hf_model(frame_image, current_time):
+    """Анализ с помощью основной HF модели"""
+    try:
+        hf_output = io.BytesIO()
+        frame_image.save(hf_output, format="JPEG", quality=85)
+        hf_bytes = hf_output.getvalue()
+
+        resp = await http_client.post(
+            HF_API_URL,
+            content=hf_bytes,
+            headers={
+                "Authorization": f"Bearer {HF_TOKEN}",
+                "Content-Type": "image/jpeg"
+            },
+            timeout=30.0
+        )
+
+        if resp.status_code == 200:
+            hf_result = resp.json()
+            logger.info(f"✅ HF analysis OK: {hf_result}")
+
+            predictions = hf_result.get('predictions', [])
+            disaster_detections = []
+
+            for pred in predictions:
+                label = pred.get('label', '').lower()
+                score = pred.get('score', 0)
+                for dtype, keywords in YOLO_DISASTER_CLASSES.items():
+                    if any(kw in label for kw in keywords):
+                        disaster_detections.append({
+                            'label': dtype,
+                            'score': score,
+                            'original_label': label,
+                            'box': pred.get('box', {}),
+                            'timestamp': current_time
+                        })
+                        break
+
+            return {
+                'predictions': predictions,
+                'disaster_detections': disaster_detections,
+                'total_objects': len(predictions),
+                'disasters_found': len(disaster_detections),
+                'timestamp': current_time,
+                'source': 'hf_space'
+            }
+        else:
+            logger.warning(f"⚠️ HF API error: {resp.status_code}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"❌ HF analysis error: {e}")
+        return None
+
 async def periodic_frame_analysis():
     """Анализируем новейший кадр каждые 10 секунд"""
     global latest_frame
@@ -339,77 +460,71 @@ async def periodic_frame_analysis():
                 frame = latest_frame
 
             current_time = get_local_time()
-            logger.info(f"📊 Analyzing latest frame from queue (HF API)...")
+            logger.info(f"📊 Analyzing latest frame with both models...")
 
+            # Запускаем обе модели параллельно
+            tasks = []
+            
             if HF_TOKEN and http_client:
-                try:
-                    hf_output = io.BytesIO()
-                    frame.save(hf_output, format="JPEG", quality=85)
-                    hf_bytes = hf_output.getvalue()
+                tasks.append(analyze_with_hf_model(frame, current_time))
+            
+            if http_client:  # Wildfire модель не требует токена
+                tasks.append(analyze_with_wildfire_model(frame, current_time))
+            
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Объединяем результаты
+                all_predictions = []
+                all_disasters = []
+                
+                for result in results:
+                    if isinstance(result, dict):
+                        all_predictions.extend(result.get('predictions', []))
+                        all_disasters.extend(result.get('disaster_detections', []))
+                
+                # Создаем объединенный результат
+                combined_result = {
+                    'predictions': all_predictions,
+                    'disaster_detections': all_disasters,
+                    'total_objects': len(all_predictions),
+                    'disasters_found': len(all_disasters),
+                    'timestamp': current_time,
+                    'source': 'combined_models'
+                }
+                
+                detection_history.append(combined_result)
+                if len(detection_history) > MAX_HISTORY:
+                    detection_history.pop(0)
 
-                    resp = await http_client.post(
-                        HF_API_URL,
-                        content=hf_bytes,
-                        headers={
-                            "Authorization": f"Bearer {HF_TOKEN}",
-                            "Content-Type": "image/jpeg"
-                        },
-                        timeout=30.0
-                    )
+                # Обновляем latest_log
+                if all_disasters:
+                    main_disaster = max(all_disasters, key=lambda x: x['score'])
+                    latest_log = {
+                        "disasters": len(all_disasters),
+                        "type": main_disaster['label'],
+                        "confidence": main_disaster['score'],
+                        "total_objects": len(all_predictions),
+                        "timestamp": current_time
+                    }
+                else:
+                    latest_log = {
+                        "disasters": 0,
+                        "type": "none",
+                        "confidence": 0.0,
+                        "total_objects": len(all_predictions),
+                        "timestamp": current_time
+                    }
 
-                    if resp.status_code == 200:
-                        hf_result = resp.json()
-                        logger.info(f"✅ HF analysis OK: {hf_result}")
-
-                        predictions = hf_result.get('predictions', [])
-                        disaster_detections = []
-
-                        for pred in predictions:
-                            label = pred.get('label', '').lower()
-                            score = pred.get('score', 0)
-                            for dtype, keywords in YOLO_DISASTER_CLASSES.items():
-                                if any(kw in label for kw in keywords):
-                                    disaster_detections.append({
-                                        'label': dtype,
-                                        'score': score,
-                                        'original_label': label,
-                                        'box': pred.get('box', {}),
-                                        'timestamp': current_time
-                                    })
-                                    break
-
-                        analysis_result = {
-                            'predictions': predictions,
-                            'disaster_detections': disaster_detections,
-                            'total_objects': len(predictions),
-                            'disasters_found': len(disaster_detections),
-                            'timestamp': current_time
-                        }
-
-                        detection_history.append(analysis_result)
-                        if len(detection_history) > MAX_HISTORY:
-                            detection_history.pop(0)
-
-                        if disaster_detections:
-                            main_disaster = disaster_detections[0]
-                            await add_log(
-                                disasters_found=len(disaster_detections),
-                                disaster_type=main_disaster['label'],
-                                confidence=main_disaster['score'],
-                                total_objects=len(predictions)
-                            )
-                    else:
-                        logger.error(f"❌ HF API error: {resp.status_code}")
-
-                except Exception as e:
-                    logger.error(f"❌ HF analysis error: {e}")
-            else:
-                logger.warning("⚠️ HF_TOKEN not configured")
+                await add_log(
+                    disasters_found=len(all_disasters),
+                    disaster_type=latest_log["type"],
+                    confidence=latest_log["confidence"],
+                    total_objects=len(all_predictions)
+                )
 
         except Exception as e:
-            logger.error(f"❌ Periodic analysis error: {e}")
-            await asyncio.sleep(1)  # Не спамим логи при ошибке
-
+            logger.error(f"❌ Periodic analysis error: {e}")  # Не спамим логи при ошибке
 
 @app.post("/api/upload-frame")
 async def upload_frame(request: Request):

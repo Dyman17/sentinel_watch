@@ -620,18 +620,18 @@ export const SimpleStream = () => {
 
                   {/* No Detections */}
                   {(!latestResult.full_log?.disaster_detections?.length && !latestResult.full_log?.detections?.length) && (
-                    <div className="text-gray-400 text-xs bg-gray-500/10 p-3 rounded">
+                    <div className="text-gray-400 text-xs bg-gray-500/10 p-3 rounded font-inter">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                        <span>Объектов не обнаружено</span>
+                        <span>Objects not detected</span>
                       </div>
                     </div>
                   )}
 
-                  <div className="text-xs text-gray-500 pt-2 border-t border-gray-700 space-y-1">
-                    <div>📊 Объекты (HF): <span className="font-bold text-white">{latestResult.full_log?.detections?.length || 0}</span></div>
-                    <div>⚡ Реальное: <span className="font-bold text-cyan-400">{latestResult.real_time || 0}</span></div>
-                    <div>⏱️ Время: <span className="text-gray-300 font-mono text-xs">{new Date(latestResult.timestamp * 1000).toLocaleTimeString('ru-RU')}</span></div>
+                  <div className="text-xs text-gray-400 pt-2 border-t border-gray-700 space-y-1 font-inter">
+                    <div>📊 Objects (HF): <span className="font-bold text-white">{latestResult.full_log?.detections?.length || 0}</span></div>
+                    <div>⚡ Real-time: <span className="font-bold text-cyan-400">{latestResult.real_time || 0}</span></div>
+                    <div>⏱️ Time: <span className="text-gray-300 font-mono text-xs">{new Date(latestResult.timestamp * 1000).toLocaleTimeString('en-US')}</span></div>
                   </div>
                 </div>
               )}
@@ -640,80 +640,109 @@ export const SimpleStream = () => {
         </Card>
 
         {/* Latest Analysis - Right Top */}
-        <Card>
+        <Card className="font-sans">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2 font-inter">
               <Activity className="w-5 h-5" />
-              🤖 AI Анализ
+              🤖 AI Analysis
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {/* Real-time Client Detections */}
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-cyan-500 uppercase">⚡ Реальное время (TensorFlow):</div>
+                <div className="text-xs font-semibold text-cyan-500 uppercase font-inter">⚡ Real-time (TensorFlow):</div>
                 {clientDetections.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {clientDetections.slice(0, 4).map((detection: any, index: number) => (
-                      <div key={index} className="flex flex-col gap-1 p-2 bg-cyan-950/40 border border-cyan-900/50 rounded text-xs">
+                      <div key={index} className="flex flex-col gap-1 p-2 bg-cyan-950/40 border border-cyan-900/50 rounded text-xs font-inter">
                         <span className="font-medium text-cyan-400">{detection.class}</span>
-                        <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5 bg-cyan-600">
+                        <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5 bg-cyan-600 font-inter">
                           {Math.round(detection.score * 100)}%
                         </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded">
-                    Загрузка детектора...
+                  <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded font-inter">
+                    Loading detector...
                   </div>
                 )}
               </div>
 
-              {/* Server Analysis */}
-              <div className="space-y-2 pt-2 border-t border-gray-700">
-                <div className="text-xs font-semibold text-green-500 uppercase">📡 Анализ (HuggingFace):</div>
-
-                {/* Обнаруженные объекты */}
-                <div className="space-y-1.5">
-                  <div className="text-xs font-semibold text-gray-400 uppercase">Объекты:</div>
-                  {latestResult?.full_log?.detections?.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {latestResult.full_log.detections.map((detection: any, index: number) => (
-                        <div key={index} className="flex flex-col gap-1 p-2 bg-green-950/30 border border-green-900/50 rounded text-xs">
-                          <span className="font-medium text-green-400">{detection.label}</span>
-                          <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5">
-                            {(detection.score * 100).toFixed(0)}%
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-500 p-1 bg-gray-900/20 rounded">
-                      Объектов не обнаружено
-                    </div>
-                  )}
+              {/* Server Analysis - Dual AI Models */}
+              <div className="space-y-3 pt-2 border-t border-gray-700">
+                <div className="text-xs font-semibold text-green-500 uppercase font-inter">🤖 Dual AI Analysis:</div>
+                
+                {/* HF Space Model */}
+                <div className="space-y-2 p-3 bg-blue-950/20 border border-blue-800/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    <div className="text-xs font-semibold text-blue-400 uppercase font-inter">🧠 HF Space Model:</div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-semibold text-gray-400 uppercase font-inter">Objects:</div>
+                    {latestResult?.full_log?.detections?.filter((d: any) => d.source === 'hf_space').length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {latestResult.full_log.detections.filter((d: any) => d.source === 'hf_space').slice(0, 4).map((detection: any, index: number) => (
+                          <div key={index} className="flex flex-col gap-1 p-2 bg-blue-950/40 border border-blue-900/50 rounded text-xs font-inter">
+                            <span className="font-medium text-blue-400">{detection.label}</span>
+                            <Badge variant="secondary" className="self-start text-xs px-1.5 py-0.5 bg-blue-600 font-inter">
+                              {Math.round(detection.score * 100)}%
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded font-inter">
+                        No objects detected
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Катастрофы */}
-                <div className="space-y-1.5 pt-2 border-t border-gray-600">
-                  <div className="text-xs font-semibold text-red-500 uppercase">🚨 Катастрофы:</div>
-                  {latestResult?.full_log?.disaster_detections?.length > 0 ? (
-                    <div className="space-y-1">
-                      {latestResult.full_log.disaster_detections.map((disaster: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-red-950/40 border border-red-900/50 rounded text-xs">
-                          <span className="font-bold text-red-400">{disaster.label}</span>
-                          <Badge className="bg-red-600 text-white text-xs px-1.5 py-0.5">
-                            {(disaster.score * 100).toFixed(0)}%
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-500 p-1 bg-gray-900/20 rounded">
-                      ✅ Катастроф не обнаружено
-                    </div>
-                  )}
+                {/* Wildfire Detector Model */}
+                <div className="space-y-2 p-3 bg-orange-950/20 border border-orange-800/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                    <div className="text-xs font-semibold text-orange-400 uppercase font-inter">🔥 Wildfire Detector:</div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-semibold text-gray-400 uppercase font-inter">Disasters:</div>
+                    {latestResult?.full_log?.disaster_detections?.filter((d: any) => d.source === 'wildfire_model').length > 0 ? (
+                      <div className="space-y-1">
+                        {latestResult.full_log.disaster_detections.filter((d: any) => d.source === 'wildfire_model').map((disaster: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-orange-950/40 border border-orange-900/50 rounded text-xs font-inter">
+                            <span className="font-bold text-orange-400">{disaster.label}</span>
+                            <Badge className="bg-orange-600 text-white text-xs px-1.5 py-0.5 font-inter">
+                              {Math.round(disaster.score * 100)}%
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500 p-2 bg-gray-900/20 rounded font-inter">
+                        ✅ No disasters detected
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Combined Results */}
+                <div className="space-y-2 p-3 bg-purple-950/20 border border-purple-800/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                    <div className="text-xs font-semibold text-purple-400 uppercase font-inter">⚡ Combined Results:</div>
+                  </div>
+                  
+                  <div className="text-xs text-gray-400 space-y-1 font-inter">
+                    <div>🎯 Total Objects: <span className="font-bold text-white">{latestResult?.full_log?.detections?.length || 0}</span></div>
+                    <div>🚨 Total Disasters: <span className="font-bold text-orange-400">{latestResult?.full_log?.disaster_detections?.length || 0}</span></div>
+                    <div>🧠 HF Model: <span className="font-bold text-blue-400">{latestResult?.full_log?.detections?.filter((d: any) => d.source === 'hf_space').length || 0}</span> objects</div>
+                    <div>🔥 Wildfire Model: <span className="font-bold text-orange-400">{latestResult?.full_log?.disaster_detections?.filter((d: any) => d.source === 'wildfire_model').length || 0}</span> disasters</div>
+                  </div>
                 </div>
               </div>
 

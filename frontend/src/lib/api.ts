@@ -15,6 +15,7 @@ export interface Detection {
     ymax: number
   }
   timestamp?: number
+  source?: string // 'hf_space' | 'wildfire_model' | 'combined_models'
 }
 
 export interface AnalysisResult {
@@ -23,6 +24,20 @@ export interface AnalysisResult {
   total_objects: number
   disasters_found: number
   timestamp: number
+  source: string // 'hf_space' | 'wildfire_detector' | 'combined_models'
+}
+
+export interface ModelStatus {
+  hf_model: {
+    status: 'connected' | 'error' | 'not_configured'
+    url: string
+    last_check?: number
+  }
+  wildfire_model: {
+    status: 'connected' | 'error' | 'not_configured' 
+    url: string
+    last_check?: number
+  }
 }
 
 export interface LatestLog {
@@ -32,6 +47,7 @@ export interface LatestLog {
   total_objects: number
   timestamp: number
   status: string
+  sources?: string[] // Какие модели нашли детекции
 }
 
 export interface HealthStatus {
