@@ -14,6 +14,14 @@ from PIL import Image
 import logging
 import json
 import time
+from datetime import datetime, timedelta
+
+# --- Часовой пояс +5 часов ---
+TIMEZONE_OFFSET = 5  # UTC+5 для Казахстана
+
+def get_local_time():
+    """Получить локальное время с учетом часового пояса"""
+    return time.time() + (TIMEZONE_OFFSET * 3600)
 
 # --- Настройка логов ---
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +68,7 @@ latest_detection = {
     "station_id": 1,
     "disaster_type": "No detection",
     "confidence": 0,
-    "timestamp": time.time()
+    "timestamp": get_local_time()
 }
 
 # Фейк YOLO детекции для демо
@@ -172,7 +180,7 @@ async def add_log(disasters_found: int, disaster_type: str = "", confidence: flo
         "disaster_type": disaster_type,
         "confidence": confidence,
         "total_objects": total_objects,
-        "timestamp": time.time(),
+        "timestamp": get_local_time(),
         "clients_connected": len(clients)
     }
     await log_queue.put(log_data)
@@ -195,7 +203,7 @@ async def broadcast_frame_ws(frame_bytes: bytes):
             await ws.send_text(json.dumps({
                 "type": "frame",
                 "data": frame_b64,
-                "timestamp": int(time.time() * 1000)
+                "timestamp": int(get_local_time() * 1000)
             }))
         except:
             pass
@@ -207,7 +215,7 @@ async def add_esp32_log(message: str, level: str = "INFO", device_id: str = "ESP
         "device_id": device_id,
         "level": level,
         "message": message,
-        "timestamp": time.time()
+        "timestamp": get_local_time()
     }
     esp32_logs.append(log_entry)
     if len(esp32_logs) > MAX_ESP32_LOGS:
@@ -226,12 +234,12 @@ async def websocket_logs(websocket: WebSocket):
     await websocket.send_text(json.dumps({
         "type": "connected",
         "message": "ESP32 Logger connected to SENTINEL.SAT",
-        "timestamp": time.time()
+        "timestamp": get_local_time()
     }))
 
     try:
         while True:
-            current_time = time.time()
+            current_time = get_local_time()
 
             if current_time - last_ping_time[client_id] > PING_INTERVAL:
                 try:
@@ -247,7 +255,7 @@ async def websocket_logs(websocket: WebSocket):
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
 
                 if data == "pong":
-                    last_ping_time[client_id] = time.time()
+                    last_ping_time[client_id] = get_local_time()
                     continue
 
                 if data == "status":
@@ -257,7 +265,7 @@ async def websocket_logs(websocket: WebSocket):
                         "clients_connected": len(clients),
                         "total_detections": len(detection_history),
                         "latest_log": latest_log,
-                        "timestamp": time.time()
+                        "timestamp": get_local_time()
                     }))
 
             except asyncio.TimeoutError:
@@ -290,7 +298,7 @@ async def websocket_frames(websocket: WebSocket):
             if data == "ping":
                 await websocket.send_text(json.dumps({
                     "type": "pong",
-                    "timestamp": int(time.time() * 1000)
+                    "timestamp": int(get_local_time() * 1000)
                 }))
     except WebSocketDisconnect:
         logger.info("Frame client disconnected")
@@ -330,7 +338,7 @@ async def periodic_frame_analysis():
                     continue
                 frame = latest_frame
 
-            current_time = time.time()
+            current_time = get_local_time()
             logger.info(f"📊 Analyzing latest frame from queue (HF API)...")
 
             if HF_TOKEN and http_client:
@@ -469,7 +477,7 @@ async def receive_hf_results(data: dict):
             'disaster_detections': disaster_detections,
             'total_objects': total_objects,
             'disasters_found': disasters_found,
-            'timestamp': data.get('timestamp', time.time()),
+            'timestamp': data.get('timestamp', get_local_time()),
             'source': 'hf_space'
         }
 
@@ -527,7 +535,7 @@ def get_latest_log():
             "type": "none",
             "confidence": 0.0,
             "total_objects": 0,
-            "timestamp": time.time(),
+            "timestamp": get_local_time(),
             "status": "no_data"
         }
     return latest_log
@@ -620,7 +628,7 @@ async def get_demo_stations():
                 "confidence": round(confidence, 2),
                 "color": color
             },
-            "last_update": time.time()
+            "last_update": get_local_time()
         })
     return {"stations": stations, "count": len(stations)}
 
@@ -637,7 +645,7 @@ async def get_demo_latest():
     return {
         "type": disaster,
         "confidence": round(confidence, 2),
-        "timestamp": time.time(),
+        "timestamp": get_local_time(),
         "station_id": random.randint(1, 3),
         "station_name": random.choice([s["name"] for s in DEMO_STATIONS])
     }
@@ -677,7 +685,7 @@ async def get_esp32_logs(limit: int = 50):
             "status": "ok",
             "logs": recent_logs,
             "total_logs": len(esp32_logs),
-            "timestamp": time.time()
+            "timestamp": get_local_time()
         }
     except Exception as e:
         logger.error(f"Get ESP32 logs error: {e}")
@@ -701,7 +709,7 @@ async def receive_client_detections(data: dict):
     }
     """
     try:
-        timestamp = data.get("timestamp", int(time.time() * 1000))
+        timestamp = data.get("timestamp", int(get_local_time() * 1000))
         detections = data.get("detections", [])
 
         # Store latest client detections
@@ -796,7 +804,7 @@ async def esp32_status():
                     "type": latest.get("disaster_type", "unknown"),
                     "confidence": latest.get("max_confidence", 0),
                     "source": "server",
-                    "timestamp": latest.get("timestamp", int(time.time() * 1000))
+                    "timestamp": latest.get("timestamp", int(get_local_time() * 1000))
                 }
 
         # Determine which detection to report (prefer high-confidence)
@@ -816,7 +824,7 @@ async def esp32_status():
 
         return {
             "status": "success",
-            "server_time": int(time.time()),
+            "server_time": int(get_local_time()),
             "latest_detection": latest_detection,
             "alerts": alerts,
             "disaster_count": len([d for d in detection_history if d.get("disasters_found", 0) > 0]),
