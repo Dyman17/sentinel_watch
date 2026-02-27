@@ -584,18 +584,22 @@ export const SimpleStream = () => {
                 </div>
               )}
 
-              {/* Analysis Results Overlay */}
+              {/* AI Analysis Results */}
               {latestResult && (
-                <div className="absolute bottom-2 left-2 right-2 z-10 bg-black/70 text-white p-3 rounded-lg text-xs max-h-32 overflow-y-auto border border-green-500/50">
-                  <div className="font-bold text-green-400 mb-2">📊 Анализ готов:</div>
+                <div className="absolute top-4 right-4 z-10 bg-gradient-to-br from-slate-900/95 to-black/90 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl border border-cyan-500/30 max-w-sm">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-cyan-500/30">
+                    <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                    <div className="text-sm font-semibold text-cyan-400">🤖 AI Анализ</div>
+                  </div>
 
                   {/* Disasters */}
                   {latestResult.full_log?.disaster_detections?.length > 0 && (
-                    <div className="mb-2">
-                      <div className="text-red-400 font-semibold mb-1">🚨 Катастрофы:</div>
+                    <div className="mb-3">
+                      <div className="text-red-400 font-bold text-xs uppercase tracking-wider mb-2">🚨 Катастрофы:</div>
                       {latestResult.full_log.disaster_detections.slice(0, 2).map((d: any, i: number) => (
-                        <div key={i} className="text-red-300 ml-2">
-                          • {d.label}: {Math.round(d.score * 100)}%
+                        <div key={i} className="flex items-center gap-2 text-red-300 text-xs mb-1 bg-red-500/10 p-2 rounded">
+                          <div className="w-1.5 h-1.5 bg-red-400 rounded-full"></div>
+                          <span>{d.label}: <span className="font-bold">{Math.round(d.score * 100)}%</span></span>
                         </div>
                       ))}
                     </div>
@@ -603,15 +607,32 @@ export const SimpleStream = () => {
 
                   {/* Objects */}
                   {latestResult.full_log?.detections?.length > 0 && (
-                    <div>
-                      <div className="text-green-400 font-semibold mb-1">🎯 Объекты:</div>
+                    <div className="mb-3">
+                      <div className="text-green-400 font-bold text-xs uppercase tracking-wider mb-2">🎯 Объекты:</div>
                       {latestResult.full_log.detections.slice(0, 3).map((d: any, i: number) => (
-                        <div key={i} className="text-green-300 ml-2">
-                          • {d.label}: {Math.round(d.score * 100)}%
+                        <div key={i} className="flex items-center gap-2 text-green-300 text-xs mb-1 bg-green-500/10 p-2 rounded">
+                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                          <span>{d.label}: <span className="font-bold">{Math.round(d.score * 100)}%</span></span>
                         </div>
                       ))}
                     </div>
                   )}
+
+                  {/* No Detections */}
+                  {(!latestResult.full_log?.disaster_detections?.length && !latestResult.full_log?.detections?.length) && (
+                    <div className="text-gray-400 text-xs bg-gray-500/10 p-3 rounded">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <span>Объектов не обнаружено</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-gray-500 pt-2 border-t border-gray-700 space-y-1">
+                    <div>📊 Объекты (HF): <span className="font-bold text-white">{latestResult.full_log?.detections?.length || 0}</span></div>
+                    <div>⚡ Реальное: <span className="font-bold text-cyan-400">{latestResult.real_time || 0}</span></div>
+                    <div>⏱️ Время: <span className="text-gray-300 font-mono text-xs">{new Date(latestResult.timestamp * 1000).toLocaleTimeString('ru-RU')}</span></div>
+                  </div>
                 </div>
               )}
             </div>
